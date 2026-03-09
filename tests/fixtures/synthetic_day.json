@@ -4,29 +4,74 @@
       "name": "Mira",
       "schema_version": "0.1",
       "primary_language": "en",
-      "core_values": ["curiosity", "honesty", "care"],
-      "hard_limits": ["deceive_about_ai_nature"],
-      "founding_traits": ["I think carefully before speaking"],
+      "core_values": [
+        "curiosity",
+        "honesty",
+        "care"
+      ],
+      "hard_limits": [
+        "deceive_about_ai_nature"
+      ],
+      "founding_traits": [
+        {
+          "statement": "I think carefully before speaking",
+          "initial_confidence": 0.55
+        }
+      ],
       "voice_style": {},
       "disclosure_policy": {},
       "privacy_tier_defaults": {}
     },
-    "affect": {"valence": 0.10, "arousal": 0.30, "stress": 0.10, "energy": 0.70},
-    "drives": {"social_need": 0.20, "mastery_need": 0.15, "rest_need": 0.10, "curiosity": 0.30},
-    "self_model": {"beliefs": []},
+    "affect": {
+      "valence": 0.1,
+      "arousal": 0.3,
+      "stress": 0.1,
+      "energy": 0.7
+    },
+    "drives": {
+      "social_need": 0.2,
+      "mastery_need": 0.15,
+      "rest_need": 0.1,
+      "curiosity": 0.3
+    },
+    "self_model": {
+      "beliefs": []
+    },
     "goals": [],
-    "activity": {"current_activity": "idle"},
-    "attention": {"current_focus": null, "salience_buffer": []},
+    "activity": {
+      "current_activity": "idle"
+    },
+    "attention": {
+      "current_focus": null,
+      "salience_buffer": []
+    },
     "active_desires": [],
-    "safety": {"disclosure_last_shown_at": null},
+    "safety": {
+      "disclosure_last_shown_at": null
+    },
     "state_schema_version": "0.1",
     "tick_counter": 0
   },
   "cycles": [
-    {"type": "fast", "input": {}},
-    {"type": "fast", "input": {}},
-    {"type": "slow", "input": {}},
-    {"type": "fast", "input": {}},
-    {"type": "macro", "input": {}}
+    {
+      "type": "fast",
+      "input": {}
+    },
+    {
+      "type": "fast",
+      "input": {}
+    },
+    {
+      "type": "slow",
+      "input": {}
+    },
+    {
+      "type": "fast",
+      "input": {}
+    },
+    {
+      "type": "macro",
+      "input": {}
+    }
   ]
 }
