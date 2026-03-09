@@ -222,6 +222,6 @@ Researching and specifying ego-perspective data is a *good early step* if you do
 
 ### Referenced Markdown files
 
-[architecture.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/architecture.md) 
-[ego_data.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/ego_data.md)  
-[action_plan.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/action_plan.md)
+* [architecture.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/architecture.md) 
+* [ego_data.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/ego_data.md)  
+* [action_plan.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/action_plan.md)
