@@ -1,7 +1,7 @@
 # Ego-Perspective Training Data Specification
 
 Version: 0.1
-Purpose: Define the structure, sources, and generation strategy for ego-perspective datasets used in the cognitive agent architecture.
+Objective: Define the structure, sources, and generation strategy for ego-perspective datasets used in the cognitive agent architecture.
 
 This document complements **architecture.md** and focuses on data required to support:
 
