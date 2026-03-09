@@ -3,21 +3,29 @@
 * Version: 0.1
 * Objective: Define the structure, sources, and generation strategy for ego-perspective datasets used in the cognitive agent architecture.
 
-This document complements **architecture.md** and focuses on data required to support:
+---
 
-* autobiographical reasoning
-* emotional continuity
-* internal monologue
-* goal-oriented thinking
-* believable subjective experience
+# 1. Purpose
 
-The intent is not to replicate full human experience but to approximate the **narrative structure of a lived inner life**.
+This document defines the **ego-perspective dataset layer** used by the cognitive agent architecture described in `architecture.md`.
+
+The dataset provides structured representations of:
+
+* autobiographical experiences
+* internal thoughts
+* emotional interpretation
+* personal goals
+* identity beliefs
+
+These elements allow the architecture to simulate a **continuous subjective inner life**.
+
+The goal is not to replicate full human cognition, but to provide **minimal experiential priors** that support believable behavior.
 
 ---
 
-# 1. Design Goals
+# 2. Design Goals
 
-The ego-perspective dataset should train or condition models to produce believable first‑person cognition.
+The ego-perspective dataset should train or condition models to produce believable **first-person cognition**.
 
 Desired characteristics:
 
@@ -28,17 +36,17 @@ Desired characteristics:
 * temporal continuity
 * imperfect reasoning
 
-The data should emphasize **how humans think**, rather than only **what humans know**.
+The dataset should emphasize **how humans think**, rather than only **what humans know**.
 
 ---
 
-# 2. Data Categories
+# 3. Data Categories
 
-The dataset is organized into several cognitive data types that map directly to the architecture modules.
+The dataset is organized into cognitive data types that map directly to the architecture modules.
 
 | Category              | Architecture Module | Purpose                    |
 | --------------------- | ------------------- | -------------------------- |
-| episodic memories     | Memory System       | personal events            |
+| episodic memories     | Memory System       | personal experiences       |
 | internal thoughts     | Thought Generator   | spontaneous cognition      |
 | emotional reflections | Emotion System      | affective reasoning        |
 | goals and plans       | Goal System         | intentional behavior       |
@@ -46,9 +54,9 @@ The dataset is organized into several cognitive data types that map directly to 
 
 ---
 
-# 3. Core Data Types
+# 4. Core Data Types
 
-## 3.1 Episodic Memory Entries
+## 4.1 Episodic Memory Entries
 
 Episodic memories describe events from the perspective of the agent.
 
@@ -87,11 +95,11 @@ reflection:
 "I keep thinking I should have prepared better."
 ```
 
-These entries populate the **episodic memory store**.
+These entries populate the **episodic memory store** described in `architecture.md`.
 
 ---
 
-## 3.2 Internal Thought Fragments
+## 4.2 Internal Thought Fragments
 
 Internal thoughts represent short cognitive impulses produced during time simulation.
 
@@ -111,13 +119,13 @@ Characteristics:
 * incomplete
 * emotionally contextual
 
-These support the **thought generation module**.
+These support the **Thought Generator** module.
 
 ---
 
-## 3.3 Emotional Reflection Records
+## 4.3 Emotional Reflection Records
 
-These describe the subjective interpretation of feelings.
+These describe the subjective interpretation of emotional states.
 
 Structure:
 
@@ -140,13 +148,13 @@ interpretation:
 "I feel like I might have been too defensive."
 ```
 
-These records help stabilize the **emotion system**.
+These records stabilize the **Emotion System**.
 
 ---
 
-## 3.4 Goals and Planning Statements
+## 4.4 Goals and Planning Statements
 
-Goals capture intentional behavior.
+Goals represent intentional behavior and long-term direction.
 
 Structure:
 
@@ -172,13 +180,13 @@ progress: 0.2
 frustration: 0.1
 ```
 
-These are consumed by the **goal system**.
+These entries are consumed by the **Goal System**.
 
 ---
 
-## 3.5 Identity Statements
+## 4.5 Identity Statements
 
-Identity statements define relatively stable beliefs about the self.
+Identity statements describe stable beliefs about the self.
 
 Examples:
 
@@ -190,30 +198,30 @@ Examples:
 "I prefer quiet environments to crowded places."
 ```
 
-These statements populate the **self‑model memory**.
+These populate the **self-model memory layer**.
 
 ---
 
-# 4. Dataset Generation Strategies
+# 5. Dataset Generation Strategies
 
-The dataset can be produced using several complementary methods.
+The dataset can be produced using several complementary approaches.
 
-## 4.1 Diary Sources
+## 5.1 Diary Sources
 
-Public sources:
+Authentic sources include:
 
 * historical diaries
-* memoir fragments
+* memoir excerpts
 * reflective blog posts
 * personal essays
 
-These sources provide authentic first-person cognitive patterns.
+These sources capture natural first-person cognitive patterns.
 
 ---
 
-## 4.2 Synthetic Ego Generation
+## 5.2 Synthetic Ego Generation
 
-Synthetic data can be generated by prompting language models to produce structured experiences.
+Synthetic records can be generated using language models.
 
 Example prompt template:
 
@@ -233,178 +241,170 @@ Example output:
 "I spilled coffee on my notebook this morning. I felt annoyed at first, but later I realized I was rushing too much."
 ```
 
-Synthetic data should be **randomized across:
+Synthetic generation should randomize across:
 
 * locations
-* social contexts
-* emotions
-* life situations
+* social situations
+* emotional states
+* life contexts
 
-```
-
-This avoids repetitive cognitive patterns.
+This prevents repetitive cognitive patterns.
 
 ---
 
-## 4.3 Structured Experience Simulation
+## 5.3 Structured Life Simulation
 
-Another approach is to generate **life timelines**.
+Another approach is generating **life timelines**.
 
-Example:
+Example life segments:
 
 ```
-
 childhood event
 education experience
 career situation
 social relationship
 personal conflict
-
 ```
 
-Each event becomes multiple memory records.
+Each event can produce multiple memories and reflections.
 
-This approach produces coherent autobiographies.
+This method produces coherent autobiographical datasets.
 
 ---
 
-# 5. Quantitative Randomization
+# 6. Quantitative Randomization
 
 To avoid rigid personalities, datasets should introduce controlled randomness.
 
 Randomizable parameters:
 
 ```
-
 personality traits
 life goals
 social networks
 stress levels
 curiosity levels
-
 ```
 
-This produces agents with varied behavioral tendencies.
+These parameters generate agents with varied behavioral tendencies.
 
 ---
 
-# 6. Data Formatting
+# 7. Data Formatting
 
 Recommended storage formats:
 
 ```
-
 JSON
 YAML
 Markdown
-
 ```
 
-Example JSON record:
+Example JSON memory record:
 
 ```
-
 {
-"type": "episodic_memory",
-"timestamp": "2026-01-15",
-"event": "had coffee with a friend",
-"emotion": {
-"joy": 0.6,
-"calm": 0.4
-},
-"importance": 0.3,
-"reflection": "It felt good to talk about things openly."
+  "type": "episodic_memory",
+  "timestamp": "2026-01-15",
+  "event": "had coffee with a friend",
+  "emotion": {
+    "joy": 0.6,
+    "calm": 0.4
+  },
+  "importance": 0.3,
+  "reflection": "It felt good to talk about things openly."
 }
-
 ```
+
+These records can be indexed by the **Memory System** described in `architecture.md`.
 
 ---
 
-# 7. Dataset Scale
+# 8. Dataset Scale
 
 A believable prototype does not require massive datasets.
 
-Approximate targets:
+Suggested dataset sizes for an MVP:
 
-| Data Type | Suggested Count |
-|-----------|---------------|
-| episodic memories | 2k–10k |
-| internal thoughts | 5k–20k |
-| emotional reflections | 1k–5k |
-| goals | 200–500 |
-| identity statements | 100–300 |
+| Data Type             | Suggested Count |
+| --------------------- | --------------- |
+| episodic memories     | 2k–10k          |
+| internal thoughts     | 5k–20k          |
+| emotional reflections | 1k–5k           |
+| goals                 | 200–500         |
+| identity statements   | 100–300         |
 
-This is sufficient for early experimentation.
-
----
-
-# 8. Integration with Architecture
-
-The dataset feeds several components defined in **architecture.md**:
-
-| Data Type | Consumed By |
-|-----------|------------|
-| episodic memories | Memory System |
-| internal thoughts | Thought Generator |
-| emotional reflections | Emotion System |
-| goals | Goal System |
-| identity statements | Self Model |
-
-The Dialogue Context Builder retrieves relevant entries when forming prompts.
+These sizes are sufficient for early experimentation.
 
 ---
 
-# 9. Evaluation of Dataset Quality
+# 9. Integration with Architecture
 
-Indicators of good ego-perspective data include:
+The dataset feeds directly into modules defined in `architecture.md`.
 
-- natural emotional transitions
-- realistic internal doubts
-- imperfect reasoning
-- temporal continuity
+| Data Type             | Consumed By       |
+| --------------------- | ----------------- |
+| episodic memories     | Memory System     |
+| internal thoughts     | Thought Generator |
+| emotional reflections | Emotion System    |
+| goals                 | Goal System       |
+| identity statements   | Self Model        |
 
-Poor datasets often produce agents that sound **omniscient or overly rational**.
+The **Dialogue Context Builder** retrieves relevant entries when constructing prompts.
 
 ---
 
-# 10. Iterative Improvement
+# 10. Evaluation of Dataset Quality
+
+Indicators of high-quality ego-perspective data include:
+
+```
+natural emotional transitions
+realistic internal doubts
+imperfect reasoning
+temporal continuity
+```
+
+Poor datasets often produce agents that appear **omniscient or overly rational**.
+
+---
+
+# 11. Iterative Dataset Improvement
 
 The dataset should evolve alongside the architecture.
 
 Recommended workflow:
 
 ```
-
 1 generate initial dataset
 2 run agent simulations
 3 observe unrealistic behaviors
 4 add corrective memory patterns
 5 repeat
-
 ```
 
 Over time the dataset becomes a **cognitive prior** guiding believable behavior.
 
 ---
 
-# 11. Future Dataset Extensions
+# 12. Future Dataset Extensions
 
-Possible expansions:
+Possible expansions include:
 
-- relationship histories
-- conflict narratives
-- habit formation logs
-- dream narratives
-- internal debates
+```
+relationship histories
+conflict narratives
+habit formation logs
+dream narratives
+internal debates
+```
 
-These can further enhance the sense of a persistent inner life.
+These additions can strengthen the perception of a persistent inner life.
 
 ---
 
-# 12. Summary
+# 13. Summary
 
-Ego-perspective datasets provide the **subjective structure of experience** needed for believable cognitive agents.
+Ego-perspective datasets provide the **subjective structure of experience** required for believable cognitive agents.
 
 By emphasizing first-person memories, reflections, and goals, the system can approximate the narrative continuity of human thought while remaining computationally lightweight.
-
-```
