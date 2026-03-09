@@ -1,7 +1,7 @@
 # Ego-Perspective Cognitive Agent Architecture
 
-Version: 0.1 (Prototype Architecture)
-Objective: Rapid validation of ego-perspective cognition hypothesis
+* Version: 0.1 (Prototype Architecture)
+* Objective: Rapid validation of ego-perspective cognition hypothesis
 
 ---
 
