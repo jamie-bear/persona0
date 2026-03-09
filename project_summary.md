@@ -113,8 +113,28 @@ Closed all v0.1 gaps:
 
 ## Current Status
 
-Pure design specification — no implementation code exists yet. All content lives in `.knowledge/initial_research/` across three version milestones (v0.1, v0.15, v0.16).
+Persona0 is now in an **early implementation phase**, not design-only.
+
+- **CP-0 implemented (behavior-complete):** foundational schema/contracts are live in `src/schema` and `src/engine/contracts.py`, with deterministic/ownership validation covered by `tests/test_schema.py` and `tests/test_contracts.py`.
+- **CP-1 implemented (behavior-complete):** transactional orchestration, cycle logging, replay determinism checks, append-only episodic persistence, and interaction retrieval flow are implemented in `src/engine/orchestrator.py`, `src/engine/cycle_log.py`, `src/store/episodic_store.py`, `src/engine/retrieval.py`, and `src/engine/cycles/interaction.py`, with exit-gate coverage in `tests/test_orchestrator.py`, `tests/replay/test_determinism.py`, and `tests/test_retrieval_and_interaction.py`.
+- **Scaffolded vs complete:** cycle modules under `src/engine/cycles/fast_tick.py`, `slow_tick.py`, and `macro.py` are mostly stubbed function scaffolds (contracts and signatures in place), while CP-0/CP-1 modules above are behavior-complete for their checkpoint goals.
 
 **Suggested stack (v0.16):** SQLite (state store), ChromaDB (vector retrieval), asyncio scheduler, all-MiniLM-L6-v2 embeddings, local LLM inference via llama.cpp/vLLM.
 
-**Next artifacts identified:** `persona_constitution.md`, `memory_lifecycle.md`, `eval/adversarial_scenarios.md`, `eval/continuity_benchmark.md`, `config/defaults.yaml`.
+## Checkpoint Matrix (CP-0..CP-6)
+
+| Checkpoint | Status | Scope | Owning modules/files |
+|---|---|---|---|
+| **CP-0** | **Done** | Schema/state contracts, single-writer ownership, deterministic cycle ordering contracts | `src/schema/state.py`, `src/schema/mutability.py`, `src/schema/validator.py`, `src/engine/contracts.py`, `tests/test_schema.py`, `tests/test_contracts.py` |
+| **CP-1** | **Done** | Transaction-safe orchestrator, cycle logging/hash deltas, append-only episodic store, interaction retrieval/salience/context packaging, replay determinism | `src/engine/orchestrator.py`, `src/engine/cycle_log.py`, `src/store/episodic_store.py`, `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `tests/test_orchestrator.py`, `tests/replay/test_determinism.py`, `tests/test_retrieval_and_interaction.py` |
+| **CP-2** | **In progress** | Fast-tick cognition behavior implementation beyond stubs | `src/engine/cycles/fast_tick.py`, `src/engine/orchestrator.py` |
+| **CP-3** | **Not started** | Slow-tick activity/routine/desire behavior completion | `src/engine/cycles/slow_tick.py` |
+| **CP-4** | **Not started** | Macro/nightly reflection and self-model update behavior completion | `src/engine/cycles/macro.py` |
+| **CP-5** | **Not started** | Governance/policy hardening and user lifecycle operations (forget/delete, redaction lifecycle) | `src/engine/cycles/interaction.py`, `src/store`, `src/cli/trace_viewer.py` |
+| **CP-6** | **Not started** | Evaluation harness, benchmarks, and operational readiness hardening | `tests/`, `src/cli`, `config/defaults.yaml` |
+
+## Roadmap Focus (Post CP-1)
+
+1. **Behavioralize existing cycle scaffolds** (`fast_tick`, then `slow_tick`, then `macro`) while keeping deterministic contract ordering intact.
+2. **Expand governance completeness** in interaction/store layers (policy checks, delete/forget lifecycle, audit ergonomics).
+3. **Operationalize evaluation** by extending replay/continuity benchmarks and adding CP-2..CP-6 exit-gate test coverage.
