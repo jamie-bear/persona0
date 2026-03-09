@@ -1,0 +1,83 @@
+# Persona0 v0.17 — Summary of Analysis and Proposals
+
+## What v0.17 Addresses
+
+Two gaps were identified in v0.16 that are not covered by any existing document:
+
+### Gap 1: Drive/Motivation module lacks satisfaction dynamics and desire objects
+
+v0.15 and v0.16 include drive variables (`social_need`, `mastery_need`, `rest_need`, `curiosity`) in the state schema, and v0.15's cognitive loop includes an informal `IMPULSE_CHECK` step. However:
+
+- There is no specification for how drives are *satisfied* (what events reduce which drives, and by how much)
+- There is no formal distinction between a **goal** (intentional, long-horizon) and a **desire** (spontaneous, short-horizon, ephemeral motivational pull generated when a drive exceeds a threshold)
+- There is no mechanism for a persistent unmet desire to **crystallize into a new goal**
+- The `IMPULSE_CHECK` step was absent from v0.16's cognitive loop specification, leaving its status undefined
+
+### Gap 2: No formal policy defining which state elements are self-editable
+
+v0.16 establishes single-writer ownership as a principle and provides confidence drift controls on self-beliefs. But no document answers the direct question: *which parts of agent state can the agent modify about itself, and under what rules?*
+
+Without this policy:
+- Implementers must infer mutability from scattered file sections
+- The governance layer has no explicit checklist for validating writes
+- The boundary between immutable character (core values) and adaptive identity (beliefs shaped by experience) is implicit
+
+---
+
+## What v0.17 Adds
+
+### New: `drive_system.md`
+
+Formal specification of the Drive/Motivation module:
+
+- **Drive growth model**: natural growth rates per drive variable per tick
+- **Drive satisfaction map**: which activity types satisfy which drives, and by how much
+- **Desire objects**: ephemeral, typed records (approach/avoidance, urgency, expiry) generated when drives exceed per-drive thresholds. Not persisted — only the impulse *thought* they trigger is stored.
+- **Drive→goal crystallization**: rule for when a persistent unmet desire proposes a new goal to the goal system (after `crystallization_threshold_ticks` ticks at sufficient urgency)
+- **Cognitive loop integration**: `UPDATE_DRIVES` added as step 3.5 in the fast tick; `IMPULSE_CHECK` formally replaced by `DESIRE_GENERATION` in the slow tick, with typed desire objects feeding the Thought Generator
+- **Module interface**: `DriveModule` with `update_drives`, `generate_desire`, `check_crystallization`
+
+### New: `self_editability_policy.md`
+
+Formal enumeration of state mutability across four classes:
+
+| Class | Examples |
+|---|---|
+| `CONST` (immutable) | Core values, persona name, disclosure rules, hard limits, founding traits |
+| `SELF` (agent self-editable) | Self-belief confidence (rate-capped), belief set, goal status/priority, semantic memories via reflection |
+| `EXT` (externally editable) | Operator config, user preferences, memory deletion requests |
+| `EPH` (ephemeral) | Salience buffer, active desires, appraisal results, context package, candidate response |
+
+The document also defines:
+- Two enforcement points: pre-commit validation and reflection macro-cycle exit gate
+- A direct answer to "what can the agent change about itself?" and "what can it never change?"
+- Why this policy is necessary for both believability and adversarial safety
+
+---
+
+## Complete v0.17 File Set
+
+All files are self-contained at v0.17 — no need to reference prior version directories.
+
+| File | Status | Purpose |
+|---|---|---|
+| `architecture.md` | Updated from v0.16 | Drive module added to Ego Engine core; mutability enforcement in governance layer; state schema annotated with mutability classes; desire/activity fields added |
+| `ego_data.md` | Updated from v0.16 | Desire record schema (§2.6); `trigger: desire` type on thoughts (§2.2); `crystallized_from_drive` provenance on goals (§2.4); mutability class annotations on all records |
+| `cognitive_loop.md` | Updated from v0.16 | `UPDATE_DRIVES` step (3.5) in fast tick; `DESIRE_GENERATION` replaces `IMPULSE_CHECK` in slow tick; drive delta in cycle logs; crystallization check |
+| `drive_system.md` | New in v0.17 | Drive/Motivation module: satisfaction dynamics, desire objects, crystallization rules, module interface |
+| `self_editability_policy.md` | New in v0.17 | State mutability classes (CONST/SELF/EXT/EPH), full field enumeration, enforcement points |
+| `action_plan.md` | Updated from v0.16 | Drive module deliverables in Week 3; mutability enforcement in Week 4; crystallization in Week 5; new metrics and test scenarios |
+| `overview/initial_research+instructions.md` | Updated from v0.16 | v0.16 gaps documented (§2.6); drive system in architecture layers (§4); build instructions updated (§5); next artifacts refined (§7) |
+| `overview/v0.17_summary` | New in v0.17 | This file |
+
+---
+
+## Key Design Decisions Made in v0.17
+
+1. **Desires are ephemeral, thoughts are persistent.** A desire object exists only within a tick's working state. The *impulse thought* it triggers is what gets written to episodic memory. This keeps the episodic log clean while still preserving the cognitive trace.
+
+2. **Crystallization is rate-limited.** Maximum one new goal proposal per drive per slow tick. This prevents desire-flood from inflating the goal register during periods of unmet needs.
+
+3. **The agent's immutable kernel is small.** Only 5 field types are `CONST`. This is deliberate — the more that is locked, the less the agent can authentically adapt. The goal is a stable but genuinely growable sense of self.
+
+4. **Self-belief changes require evidence trails.** Every confidence update must link to supporting reflection records. The agent cannot simply "decide" to believe something new about itself — it must accumulate evidence across multiple macro-cycles.
