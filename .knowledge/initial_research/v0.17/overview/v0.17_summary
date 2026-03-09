@@ -55,22 +55,20 @@ The document also defines:
 
 ---
 
-## Files Added in v0.17
+## Complete v0.17 File Set
 
-| File | Purpose |
-|---|---|
-| `drive_system.md` | Drive/Motivation module specification |
-| `self_editability_policy.md` | State mutability and self-editability policy |
-| `cognitive_loop.md` | Updated loop integrating Drive module and formal Desire generation |
-| `overview/v0.17_summary` | This file |
+All files are self-contained at v0.17 — no need to reference prior version directories.
 
-## Files Carried Forward (unchanged from v0.16)
-
-| File | Notes |
-|---|---|
-| `architecture.md` | Add Drive module to module list; reference `self_editability_policy.md` from governance section |
-| `ego_data.md` | No changes required; drive satisfaction events can use existing episodic event schema |
-| `action_plan.md` | Drive module and mutability policy enforcement land in Week 3 (Affect and Appraisal) and Week 5 (Guardrails) of the v0.16 6-week plan |
+| File | Status | Purpose |
+|---|---|---|
+| `architecture.md` | Updated from v0.16 | Drive module added to Ego Engine core; mutability enforcement in governance layer; state schema annotated with mutability classes; desire/activity fields added |
+| `ego_data.md` | Updated from v0.16 | Desire record schema (§2.6); `trigger: desire` type on thoughts (§2.2); `crystallized_from_drive` provenance on goals (§2.4); mutability class annotations on all records |
+| `cognitive_loop.md` | Updated from v0.16 | `UPDATE_DRIVES` step (3.5) in fast tick; `DESIRE_GENERATION` replaces `IMPULSE_CHECK` in slow tick; drive delta in cycle logs; crystallization check |
+| `drive_system.md` | New in v0.17 | Drive/Motivation module: satisfaction dynamics, desire objects, crystallization rules, module interface |
+| `self_editability_policy.md` | New in v0.17 | State mutability classes (CONST/SELF/EXT/EPH), full field enumeration, enforcement points |
+| `action_plan.md` | Updated from v0.16 | Drive module deliverables in Week 3; mutability enforcement in Week 4; crystallization in Week 5; new metrics and test scenarios |
+| `overview/initial_research+instructions.md` | Updated from v0.16 | v0.16 gaps documented (§2.6); drive system in architecture layers (§4); build instructions updated (§5); next artifacts refined (§7) |
+| `overview/v0.17_summary` | New in v0.17 | This file |
 
 ---
 
