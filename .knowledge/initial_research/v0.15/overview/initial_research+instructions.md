@@ -150,10 +150,11 @@ Testable via small-scale human evaluation using comparative protocols such as AC
 ## 8. References
 
 ### Related Documents
-* [architecture.md](architecture.md)
-* [ego_data.md](ego_data.md)
-* [action_plan.md](action_plan.md)
-* [cognitive_loop.md](cognitive_loop.md)
+* [v0.15_summary](.knowledge/initial_research/v0.15/overview/v0.15_summary)
+* [architecture.md](.knowledge/initial_research/v0.15/architecture.md)
+* [ego_data.md](.knowledge/initial_research/v0.15/ego_data.md)
+* [action_plan.md](.knowledge/initial_research/v0.15/action_plan.md)
+* [cognitive_loop.md](.knowledge/initial_research/v0.15/cognitive_loop.md)
 
 ### Citations
 1. Bates, J. "The role of emotion in believable agents." Communications of the ACM, 1994. https://dl.acm.org/doi/10.1145/176789.176803
