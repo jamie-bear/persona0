@@ -144,6 +144,11 @@ class EgoOrchestrator:
             # Step 5: Commit — state changes made by step_fns are already applied;
             # persist any episodic writes from pending_writes context
             written_fields = [w["field_path"] for w in pending_writes]
+
+            # Finalize cycle state as part of the committed state footprint.
+            self.state.clear_ephemeral()
+            self.state.tick_counter += 1
+
             after_hash = hash_state(self.state)
             delta = compute_delta(snapshot, self.state)
 
@@ -164,10 +169,6 @@ class EgoOrchestrator:
             )
             if self._logger:
                 self._logger.append(entry)
-
-            # Clear ephemeral state at end of cycle
-            self.state.clear_ephemeral()
-            self.state.tick_counter += 1
 
             return CycleResult(
                 success=True,
