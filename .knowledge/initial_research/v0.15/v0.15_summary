@@ -1,0 +1,77 @@
+# v0.15 Summary
+
+All v0.15 files are committed and pushed. Here's the full analysis and proposal:
+
+---
+
+## Analysis of v0.1: Technical and Strategic Errors Found
+
+### Critical Gaps (addressed in v0.15)
+
+1. **No cognitive loop specification.** The architecture described modules but never defined how they interact per tick. Without this, you have components but no system. The new `cognitive_loop.md` fills this entirely.
+
+2. **Missing Salience Gate.** The research document explicitly identified Global Workspace Theory as a key design principle, then the architecture omitted it. v0.15 adds a formal Salience Gate module with scoring and capacity limits.
+
+3. **Missing Appraisal module.** The research discusses the EMA appraisal model at length, but the architecture skips straight to simplistic linear emotion rules (`stress += workload * 0.3`). v0.15 adds a proper Appraisal module that evaluates events against goals and identity, producing structured appraisal results that *then* drive emotion updates.
+
+4. **No Input Processor.** The architecture had no specification for how user messages become internal events. Conversations just "happened" with no mechanism to feed back into state. v0.15 adds an explicit Input Processor and post-conversation state update pipeline.
+
+5. **No memory retrieval policy.** Memory storage was described but retrieval was completely unspecified. v0.15 formalizes the retrieval scoring function: `similarity * w1 + recency * w2 + importance * w3 + emotional_resonance * w4`.
+
+6. **Contradictory ego-data ordering.** The research document simultaneously said ego data is "a reasonable early research direction" AND warned it's "often mis-ordered." v0.15 resolves this: architecture first, data second.
+
+7. **No consistency constraints on ego data.** Randomization without global constraints produces contradictory life histories. v0.15 adds life skeletons, timeline validation, and quality gates.
+
+### Moderate Issues (addressed in v0.15)
+
+8. **Emotion model too simplistic.** Linear, unbounded update rules replaced with bounded, interacting dynamics including cross-variable effects (high stress reduces energy recovery).
+
+9. **No conversational policy.** The agent had no mechanism for deciding *how* to talk (sharing depth, topic steering, emotional masking). v0.15 adds a policy layer in the Context Builder.
+
+10. **State variables untyped.** Informal string labels replaced with typed, ranged, semantically defined variables.
+
+11. **References were messy.** Duplicate citations under different numbers, incorrect numbering. Cleaned up in v0.15.
+
+12. **JSON flat files for state.** Upgraded recommendation to SQLite for ACID guarantees and query capability.
+
+---
+
+## What the v0.15 Deliverables Contain
+
+| File | What's New |
+|------|-----------|
+| `initial_research_and_instructions.md` | Cleaned references, resolved contradictions, tightened recommendations, explicit "v0.1 gap addressed" callouts |
+| `architecture.md` | Added Salience Gate, Appraisal, Input Processor, memory retrieval policy, bounded emotion dynamics, conversational policy, typed state variables, failure mode mitigations |
+| `ego_data.md` | Added life skeletons, consistency constraints, quality gates, anti-degeneration strategy, relationship records, formal JSON schemas, retrieval-first integration |
+| `action_plan.md` | Reordered phases (architecture before data), added go/no-go gates, concrete deliverables per phase, risk register, directory structure |
+| `cognitive_loop.md` | **Entirely new.** Formal tick specification with 4 tick types (fast/slow/daily/conversation), execution sequences, data flow diagrams, module interface contracts, state invariants, configuration schema |
+
+---
+
+## Proposed Further Changes for Your Review
+
+### Near-term (before writing code)
+
+1. **Create a `config/defaults.yaml` file** with all the tunable parameters from `cognitive_loop.md` section 9. This makes the system tweakable without code changes.
+
+2. **Write a `CLAUDE.md` or `CONTRIBUTING.md`** that codifies the project's development rules (architecture-first, no premature fine-tuning, SQLite over JSON, etc.) so future contributors don't regress.
+
+3. **Define a concrete test persona** (`data/personas/test_001/skeleton.yaml`) -- the life skeleton from `ego_data.md` section 5.1. Having a specific character to build toward focuses the prototype.
+
+### Medium-term (during Phase 1 implementation)
+
+4. **Implement the cognitive loop in Python** following the specification in `cognitive_loop.md`. This is the single highest-value engineering task.
+
+5. **Add a simple CLI or TUI debugger** that visualizes the agent's state in real-time during simulation ticks (emotion values, recent thoughts, salient items). Observability is a core design principle -- make it easy.
+
+6. **Consider using an event bus** (even a simple `queue.Queue`) between modules rather than direct function calls. This makes it easier to add logging, replay ticks, and eventually distribute modules.
+
+### Longer-term (after basic prototype works)
+
+7. **Explore using a small LLM for appraisal** instead of rule-based matching. The renderer model can be prompted to evaluate event-goal relevance, which would be more flexible than keyword matching.
+
+8. **Add a relationship model** as a first-class module (not just memory records). Social dynamics are one of the strongest believability signals and the current architecture treats them as passive data.
+
+9. **Investigate "memory interference"** -- humans don't just forget, they misremember. Adding controlled memory distortion during consolidation could be a cheap believability boost.
+
+10. **Plan for multi-session evaluation** -- single conversations don't test temporal continuity well. Design a test protocol where testers return over multiple days.
