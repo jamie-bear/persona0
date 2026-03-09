@@ -220,8 +220,8 @@ Researching and specifying ego-perspective data is a *good early step* if you do
 - avoids synthetic-data-only pipelines (because of model collapse risk), citeturn7search0turn7search4  
 - integrates ego episodes first through retrieval memory (RAG-like), with fine-tuning reserved for style calibration (LoRA/QLoRA if needed). citeturn6search0turn6search1turn6search2  
 
-### Delivered Markdown files
+### Referenced Markdown files
 
-[Download architecture.md](sandbox:/mnt/data/architecture.md)  
-[Download ego_data.md](sandbox:/mnt/data/ego_data.md)  
-[Download action_plan.md](sandbox:/mnt/data/action_plan.md)
+[architecture.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/architecture.md) 
+[ego_data.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/ego_data.md)  
+[action_plan.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/action_plan.md)
