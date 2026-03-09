@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState, SelfBelief
+from ..modules._config import load_reflection_config
 
 
 def select_high_signal_episodes(
@@ -135,8 +136,12 @@ def update_self_beliefs(state: AgentState, event: Dict[str, Any], pending_writes
         event["_macro_accepted_reflections"] = []
         return
 
+    reflection_cfg = load_reflection_config()
+    max_new = int(reflection_cfg.get("max_new_statements_per_cycle", 3))
+
     beliefs_by_statement = {b.statement: b for b in state.self_model.beliefs}
     changed = False
+    new_statements_created = 0
 
     for reflection in accepted:
         statement = str(reflection.get("proposed_self_belief_update", "")).strip()
@@ -148,6 +153,8 @@ def update_self_beliefs(state: AgentState, event: Dict[str, Any], pending_writes
 
         belief = beliefs_by_statement.get(statement)
         if belief is None:
+            if new_statements_created >= max_new:
+                continue
             belief = SelfBelief(
                 id=f"macro-belief-{len(state.self_model.beliefs) + 1:03d}",
                 statement=statement,
@@ -156,6 +163,7 @@ def update_self_beliefs(state: AgentState, event: Dict[str, Any], pending_writes
             )
             state.self_model.beliefs.append(belief)
             beliefs_by_statement[statement] = belief
+            new_statements_created += 1
             changed = True
 
         if reflection_id and reflection_id not in belief.supporting_reflections:
@@ -210,7 +218,12 @@ def goal_review(state: AgentState, event: Dict[str, Any], pending_writes: List) 
 
 
 def drive_review(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """8. Drive review — log unmet high-pressure drives for traceability."""
+    """8. Drive review — log unmet high-pressure drives and clear nightly ephemeral state.
+
+    Also clears persisted_desires and consecutive_thought_categories as
+    documented in the AgentState schema (both are specified as cleared at
+    the nightly macro cycle).
+    """
     drives = state.drives.model_dump()
     unmet = [
         {"drive": name, "value": round(float(value), 4)}
@@ -218,6 +231,13 @@ def drive_review(state: AgentState, event: Dict[str, Any], pending_writes: List)
         if float(value) >= float(event.get("_macro_unmet_drive_threshold", 0.70))
     ]
     event["_macro_unmet_drives"] = unmet
+
+    # Clear nightly ephemeral fields (AgentState docstrings: "Cleared at nightly macro cycle")
+    if state.persisted_desires:
+        state.persisted_desires = []
+        pending_writes.append({"field_path": "persisted_desires", "author_module": "DriveModule"})
+    if state.consecutive_thought_categories:
+        state.consecutive_thought_categories = []
 
 
 def _load_candidate_episodes(event: Dict[str, Any]) -> List[Dict[str, Any]]:

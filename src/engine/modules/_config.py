@@ -46,3 +46,7 @@ def load_memory_config() -> Dict[str, Any]:
 
 def load_tick_config() -> Dict[str, Any]:
     return load_config_section("tick")
+
+
+def load_reflection_config() -> Dict[str, Any]:
+    return load_config_section("reflection")

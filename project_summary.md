@@ -121,7 +121,7 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-3 are comp
 - **CP-3 (done):** Affect + drive dynamics + desire generation — all fast-tick and slow-tick steps are behavior-complete. All CP-3 exit gates verified (see below).
 - **CP-4 (in progress):** Deterministic nightly macro-cycle scaffolding implemented (`select_high_signal_episodes`, `cluster_episodes`, `produce_candidate_reflections`, `score_evidence_sufficiency`, `update_self_beliefs`, `archive_reflection`, `goal_review`, `drive_review`) with explicit default-step registration and focused unit coverage.
 
-**126 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, and `test_macro_tick`.
+**128 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, and `test_macro_tick`.
 
 ### CP-3 Modules Implemented
 
