@@ -27,6 +27,14 @@ from .contracts import (
     GENERATE_THOUGHT,
     INGEST_TURN,
     LOG_CYCLE,
+    SCORE_EVIDENCE_SUFFICIENCY,
+    SELECT_HIGH_SIGNAL_EPISODES,
+    CLUSTER_EPISODES,
+    PRODUCE_CANDIDATE_REFLECTIONS,
+    UPDATE_SELF_BELIEFS,
+    ARCHIVE_REFLECTION,
+    GOAL_REVIEW,
+    DRIVE_REVIEW,
     RETRIEVE_MEMORY_CANDIDATES,
     ROUTINE_EVENT,
     SALIENCE_COMPETITION,
@@ -37,7 +45,7 @@ from .contracts import (
     WORLD_INGEST,
     WRITE_MEMORY,
 )
-from .cycles import fast_tick, slow_tick, interaction
+from .cycles import fast_tick, slow_tick, interaction, macro
 from .orchestrator import EgoOrchestrator
 
 
@@ -99,5 +107,15 @@ def register_default_steps(
         orchestrator.register_step(ROUTINE_EVENT, _routine_event_with_store)
     else:
         orchestrator.register_step(ROUTINE_EVENT, slow_tick.routine_event)
+
+    # ── Macro cycle (CP-4 stubs) ───────────────────────────────────────────────
+    orchestrator.register_step(SELECT_HIGH_SIGNAL_EPISODES, macro.select_high_signal_episodes)
+    orchestrator.register_step(CLUSTER_EPISODES, macro.cluster_episodes)
+    orchestrator.register_step(PRODUCE_CANDIDATE_REFLECTIONS, macro.produce_candidate_reflections)
+    orchestrator.register_step(SCORE_EVIDENCE_SUFFICIENCY, macro.score_evidence_sufficiency)
+    orchestrator.register_step(UPDATE_SELF_BELIEFS, macro.update_self_beliefs)
+    orchestrator.register_step(ARCHIVE_REFLECTION, macro.archive_reflection)
+    orchestrator.register_step(GOAL_REVIEW, macro.goal_review)
+    orchestrator.register_step(DRIVE_REVIEW, macro.drive_review)
 
     return orchestrator

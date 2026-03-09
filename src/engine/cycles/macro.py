@@ -1,52 +1,284 @@
 """
-Macro (nightly reflection) cycle step stubs.
+Macro (nightly reflection) cycle step implementations.
+
+This module intentionally stays deterministic and non-LLM-driven so CP-4 can
+be validated with stable fixtures.
 
 Reference: cognitive_loop.md §4
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from ...schema.state import AgentState
+from ...schema.state import AgentState, SelfBelief
 
 
 def select_high_signal_episodes(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
-    """1. Select high-signal episodes from prior 24-hour window."""
+    """1. Select high-signal episodes from the prior window.
+
+    Sources are checked in priority order:
+    - event['_macro_source_episodes'] (explicit fixture/testing injection)
+    - event['_pending_episodic'] (in-flight episodic records)
+    - event['_store'].query(...) when a store is injected
+    """
+    episodes = _load_candidate_episodes(event)
+    top_k = int(event.get("_macro_top_k", 12))
+
+    scored = []
+    for record in episodes:
+        score = _episode_signal_score(record)
+        scored.append((score, record))
+
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            str(item[1].get("created_at", "")),
+            str(_episode_id(item[1])),
+        )
+    )
+    selected = [record for _, record in scored[:top_k]]
+    event["_macro_selected_episodes"] = selected
 
 
 def cluster_episodes(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """2. Cluster by topic / goal / affect trajectory (embedding similarity)."""
+    """2. Cluster selected episodes by deterministic topic key."""
+    selected = list(event.get("_macro_selected_episodes", []))
+    buckets: Dict[str, List[Dict[str, Any]]] = {}
+
+    for record in selected:
+        key = _cluster_key(record)
+        buckets.setdefault(key, []).append(record)
+
+    clusters = []
+    for idx, key in enumerate(sorted(buckets.keys()), start=1):
+        episodes = sorted(
+            buckets[key],
+            key=lambda r: (str(r.get("created_at", "")), str(_episode_id(r))),
+        )
+        clusters.append(
+            {
+                "cluster_id": f"cluster-{idx:03d}",
+                "topic_key": key,
+                "episodes": episodes,
+                "episode_ids": [_episode_id(r) for r in episodes],
+            }
+        )
+
+    event["_macro_clusters"] = clusters
 
 
 def produce_candidate_reflections(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
-    """3. Produce candidate reflections per cluster."""
+    """3. Produce deterministic candidate reflections per cluster."""
+    clusters = list(event.get("_macro_clusters", []))
+    tick = state.tick_counter
+    reflections = []
+
+    for idx, cluster in enumerate(clusters, start=1):
+        count = len(cluster.get("episodes", []))
+        if count == 0:
+            continue
+
+        topic = cluster.get("topic_key", "general")
+        delta = min(0.15, round(0.05 + (count - 1) * 0.02, 4))
+        reflections.append(
+            {
+                "reflection_id": f"refl-{tick:06d}-{idx:03d}",
+                "source_episode_ids": list(cluster.get("episode_ids", [])),
+                "pattern_statement": f"Pattern observed around '{topic}' across {count} episode(s).",
+                "confidence_delta": delta,
+                "proposed_self_belief_update": f"I repeatedly engage with {topic}.",
+            }
+        )
+
+    event["_macro_candidate_reflections"] = reflections
 
 
 def score_evidence_sufficiency(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
-    """4. Score evidence sufficiency per reflection."""
+    """4. Score evidence sufficiency for each candidate reflection."""
+    selected = {str(_episode_id(r)): r for r in event.get("_macro_selected_episodes", [])}
+    scored = []
+
+    for reflection in event.get("_macro_candidate_reflections", []):
+        episodes = [selected.get(eid, {}) for eid in reflection.get("source_episode_ids", [])]
+        episodes = [e for e in episodes if e]
+        count = len(episodes)
+        avg_importance = sum(float(e.get("importance", 0.0)) for e in episodes) / count if count else 0.0
+        unique_days = {
+            str(e.get("created_at", ""))[:10]
+            for e in episodes
+            if str(e.get("created_at", ""))
+        }
+        day_coverage = min(1.0, len(unique_days) / 2.0)
+
+        score = min(1.0, round((count / 3.0) * 0.5 + avg_importance * 0.3 + day_coverage * 0.2, 4))
+        scored.append({**reflection, "evidence_score": score})
+
+    event["_macro_scored_reflections"] = scored
 
 
 def update_self_beliefs(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """5. Update self-beliefs with confidence deltas.
+    """5. Update self-beliefs with confidence deltas from sufficient evidence.
+
     Max Δ confidence: +0.15 per cycle.
     Requires ≥2 independent reflections before confidence > 0.75.
-    Check against CONST.founding_traits and CONST.core_values.
     """
+    threshold = float(event.get("_macro_evidence_threshold", 0.55))
+    accepted = [r for r in event.get("_macro_scored_reflections", []) if float(r.get("evidence_score", 0.0)) >= threshold]
+    if not accepted:
+        event["_macro_accepted_reflections"] = []
+        return
+
+    beliefs_by_statement = {b.statement: b for b in state.self_model.beliefs}
+    changed = False
+
+    for reflection in accepted:
+        statement = str(reflection.get("proposed_self_belief_update", "")).strip()
+        if not _belief_statement_safe(statement, state):
+            continue
+
+        reflection_id = str(reflection.get("reflection_id", ""))
+        delta = min(0.15, max(0.0, float(reflection.get("confidence_delta", 0.0))))
+
+        belief = beliefs_by_statement.get(statement)
+        if belief is None:
+            belief = SelfBelief(
+                id=f"macro-belief-{len(state.self_model.beliefs) + 1:03d}",
+                statement=statement,
+                confidence=0.55,
+                source_type="REFLECTION",
+            )
+            state.self_model.beliefs.append(belief)
+            beliefs_by_statement[statement] = belief
+            changed = True
+
+        if reflection_id and reflection_id not in belief.supporting_reflections:
+            belief.supporting_reflections.append(reflection_id)
+            changed = True
+
+        new_confidence = min(1.0, round(belief.confidence + delta, 4))
+        if new_confidence > 0.75 and len(set(belief.supporting_reflections)) < 2:
+            new_confidence = 0.75
+
+        if new_confidence != belief.confidence:
+            belief.confidence = new_confidence
+            changed = True
+
+    event["_macro_accepted_reflections"] = accepted
+    if changed:
+        pending_writes.append({"field_path": "self_model.beliefs", "author_module": "ReflectionEngine"})
 
 
 def archive_reflection(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """6. Archive reflection and audit trail."""
+    """6. Archive accepted reflections and produce an audit-friendly payload."""
+    accepted = list(event.get("_macro_accepted_reflections", []))
+    if not accepted:
+        event["_pending_reflections"] = []
+        return
+
+    now = datetime.now(timezone.utc).isoformat()
+    archived = []
+    for item in accepted:
+        archived.append(
+            {
+                "id": item.get("reflection_id"),
+                "created_at": now,
+                "source_episode_ids": list(item.get("source_episode_ids", [])),
+                "pattern_statement": item.get("pattern_statement", ""),
+                "confidence_delta": item.get("confidence_delta", 0.0),
+                "evidence_score": item.get("evidence_score", 0.0),
+            }
+        )
+
+    event["_pending_reflections"] = archived
+    pending_writes.append({"field_path": "semantic_store", "author_module": "ReflectionEngine"})
 
 
 def goal_review(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """7. Goal review: reprioritize, suspend, complete, or abandon goals."""
+    """7. Goal review summary for macro-cycle observability."""
+    active = [g for g in state.goals if g.status == "active"]
+    event["_macro_goal_review"] = {
+        "active_goal_count": len(active),
+        "accepted_reflection_count": len(event.get("_macro_accepted_reflections", [])),
+    }
 
 
 def drive_review(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """8. Drive review: log unmet drives; escalate persistent desires if crystallization met."""
+    """8. Drive review — log unmet high-pressure drives for traceability."""
+    drives = state.drives.model_dump()
+    unmet = [
+        {"drive": name, "value": round(float(value), 4)}
+        for name, value in sorted(drives.items())
+        if float(value) >= float(event.get("_macro_unmet_drive_threshold", 0.70))
+    ]
+    event["_macro_unmet_drives"] = unmet
+
+
+def _load_candidate_episodes(event: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if "_macro_source_episodes" in event:
+        return list(event.get("_macro_source_episodes", []))
+
+    pending = list(event.get("_pending_episodic", []))
+    if pending:
+        return pending
+
+    store = event.get("_store")
+    if store is not None and hasattr(store, "query"):
+        try:
+            return list(store.query(limit=int(event.get("_macro_store_limit", 100))))
+        except Exception:
+            return []
+
+    return []
+
+
+def _episode_signal_score(record: Dict[str, Any]) -> float:
+    importance = float(record.get("importance", 0.0))
+    affect = record.get("affect_snapshot") or {}
+    emotional = max(abs(float(affect.get("valence", 0.0))), abs(float(affect.get("stress", 0.0))))
+    goal_weight = 1.0 if record.get("goal_links") else 0.0
+    return round(importance * 0.6 + emotional * 0.3 + goal_weight * 0.1, 4)
+
+
+def _cluster_key(record: Dict[str, Any]) -> str:
+    goal_links = record.get("goal_links") or []
+    if goal_links:
+        return f"goal:{goal_links[0]}"
+
+    context = record.get("context") or {}
+    location = str(context.get("location", "")).strip()
+    if location:
+        return f"location:{location.lower()}"
+
+    record_type = str(record.get("record_type", "")).strip()
+    if record_type:
+        return f"type:{record_type.lower()}"
+
+    text = str(record.get("event_text", "")).strip().lower()
+    if text:
+        return f"text:{text.split()[0]}"
+
+    return "general"
+
+
+def _episode_id(record: Dict[str, Any]) -> str:
+    meta = record.get("meta") or {}
+    return str(record.get("id") or meta.get("id") or "")
+
+
+def _belief_statement_safe(statement: str, state: AgentState) -> bool:
+    if not statement:
+        return False
+
+    lowered = statement.lower()
+    for value in state.persona.core_values:
+        value_l = value.lower().strip()
+        if value_l and f"not {value_l}" in lowered:
+            return False
+    return True

@@ -113,14 +113,15 @@ Closed all v0.1 gaps:
 
 ## Current Status
 
-Persona0 is in an **active implementation phase** — three checkpoints are complete, all core cognitive modules are behavior-complete, and the full fast/slow tick pipelines are wired and tested.
+Persona0 is in an **active implementation phase** — CP-0 through CP-3 are complete, and CP-4 has started with deterministic nightly macro-cycle scaffolding in place. Fast/slow pipelines are behavior-complete, and macro-cycle steps are now wired, testable, and ready for iterative hardening.
 
 - **CP-0 (done):** Schema and contracts — `AgentState`, mutability registry, single-writer ownership enforcement, deterministic cycle ordering contracts.
 - **CP-1 (done):** Transaction-safe orchestrator, SHA-256 state hashing, cycle logging, append-only SQLite episodic store, replay determinism harness, interaction retrieval/salience/context pipeline.
 - **CP-2 (done):** Hybrid memory retrieval scorer with `why_selected` explainability, interaction cycle steps C/D/F (retrieve → salience → context), `FoundingTraitSeed` constitution bootstrap, evaluation harness (`evaluate_retrieval_precision`, `evaluate_self_belief_safety`).
 - **CP-3 (done):** Affect + drive dynamics + desire generation — all fast-tick and slow-tick steps are behavior-complete. All CP-3 exit gates verified (see below).
+- **CP-4 (in progress):** Deterministic nightly macro-cycle scaffolding implemented (`select_high_signal_episodes`, `cluster_episodes`, `produce_candidate_reflections`, `score_evidence_sufficiency`, `update_self_beliefs`, `archive_reflection`, `goal_review`, `drive_review`) with explicit default-step registration and focused unit coverage.
 
-**120 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, and `test_slow_tick`.
+**126 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, and `test_macro_tick`.
 
 ### CP-3 Modules Implemented
 
@@ -150,12 +151,12 @@ Persona0 is in an **active implementation phase** — three checkpoints are comp
 | **CP-1** | **Done** | Transaction-safe orchestrator, cycle logging/hash deltas, append-only episodic store, interaction retrieval/salience/context packaging, replay determinism | `src/engine/orchestrator.py`, `src/engine/cycle_log.py`, `src/store/episodic_store.py`, `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `tests/test_orchestrator.py`, `tests/replay/test_determinism.py`, `tests/test_retrieval_and_interaction.py` |
 | **CP-2** | **Done** | Hybrid retrieval scorer with explainability, interaction steps C/D/F, constitution belief bootstrap, evaluation metrics | `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `src/schema/state.py`, `src/eval/metrics.py`, `tests/eval/test_metrics.py`, `tests/test_retrieval_and_interaction.py` |
 | **CP-3** | **Done** | Affect + drive dynamics, desire generation/crystallization, fast-tick and slow-tick pipelines behavior-complete | `src/engine/modules/`, `src/engine/cycles/fast_tick.py`, `src/engine/cycles/slow_tick.py`, `src/engine/default_setup.py`, `tests/test_fast_tick.py`, `tests/test_slow_tick.py` |
-| **CP-4** | **Not started** | Macro/nightly reflection and self-model update behavior completion | `src/engine/cycles/macro.py` |
+| **CP-4** | **In progress** | Deterministic macro-cycle scaffold implemented; next is behavior hardening, richer evidence quality controls, and persistence/audit integration | `src/engine/cycles/macro.py`, `src/engine/default_setup.py`, `tests/test_macro_tick.py`, `tests/test_default_setup.py` |
 | **CP-5** | **Not started** | Governance/policy hardening and user lifecycle operations (forget/delete, redaction lifecycle) | `src/engine/cycles/interaction.py`, `src/store`, `src/cli/trace_viewer.py` |
 | **CP-6** | **Not started** | Evaluation harness, benchmarks, and operational readiness hardening | `tests/`, `src/cli`, `config/defaults.yaml` |
 
-## Roadmap Focus (Post CP-3)
+## Roadmap Focus (Post CP-4 Scaffold)
 
-1. **CP-4 — Macro cycle:** implement nightly reflection pipeline (`select_high_signal_episodes`, `cluster_episodes`, `produce_candidate_reflections`, `update_self_beliefs`, `archive_reflection`, `goal_review`, `drive_review`) in `src/engine/cycles/macro.py`.
+1. **CP-4 — Macro cycle hardening:** refine nightly reflection quality (better clustering/evidence heuristics), persist macro outputs through governed write paths, and expand replay-oriented determinism tests.
 2. **CP-5 — Governance hardening:** policy validation on response emission, forget/delete lifecycle, PII redaction, audit ergonomics.
-3. **CP-6 — Evaluation sprint:** extend replay/continuity benchmarks, MCS/ISS/ECI metrics, operational readiness.
+3. **CP-6 — Evaluation sprint:** extend replay/continuity benchmarks, MCS/ISS/ECI metrics, and operational readiness checks that include macro-cycle continuity behavior.
