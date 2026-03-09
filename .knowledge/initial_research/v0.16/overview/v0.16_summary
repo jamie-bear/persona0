@@ -1,0 +1,15 @@
+# v0.16 Summary by ChatGPT Codex
+
+All v0.15 files are committed and pushed. Here's the full analysis and proposal:
+
+* Conducted a full repo/doc analysis and created a new versioned knowledge baseline at .knowledge/initial_research/v0.16/ without touching existing v0.1 files. The new architecture spec now cleanly separates contracts, defines single-writer module ownership, adds governance controls, and formalizes transaction-safe conversation flow with measurable non-functional targets.
+
+* Replaced the prior loosely scoped data guidance with a stricter ego-data specification including shared metadata/provenance, normalized record schemas, quality gates, drift controls, and privacy/erasure lifecycle hooks.
+
+* Added a refined delivery plan with explicit week-by-week milestones, measurable exit criteria, test matrix, core metrics (MCS/ISS/ECI), and governance cadence.
+
+* Added a research synthesis/instructions document that explicitly diagnoses technical + strategic errors in v0.1 and defines a cleaner execution doctrine for Persona0 (schema-first, deterministic loop-first, LLM-last integration).
+
+* Added the requested new cognitive_loop.md, defining interaction/background/reflection cycles, ordered pipeline stages, rollback semantics, module data contracts, failure mitigations, observability, and pseudocode execution pattern.
+
+* Included additional proposed changes for your review inside the plan and synthesis docs (persona constitution, memory lifecycle service, counterfactual simulator, benchmark harness, adversarial pack).
