@@ -58,6 +58,37 @@ def test_affect_bounds_enforced():
     assert any("valence" in e for e in result.errors)
 
 
+
+
+def test_founding_traits_require_structured_objects():
+    """founding_traits entries must include statement + initial_confidence."""
+    data = json.loads((FIXTURES / "sample_state.json").read_text())
+    data["persona"]["founding_traits"] = ["legacy string trait"]
+    result = validate_state_packet(data)
+    assert not result.valid
+    assert any("founding_traits" in e for e in result.errors)
+
+
+def test_founding_trait_confidence_bounds_enforced():
+    """Founding trait confidence must be clamped to [0, 1]."""
+    data = json.loads((FIXTURES / "sample_state.json").read_text())
+    data["persona"]["founding_traits"][0]["initial_confidence"] = 1.2
+    result = validate_state_packet(data)
+    assert not result.valid
+    assert any("initial_confidence" in e for e in result.errors)
+
+
+def test_bootstrap_seeds_beliefs_from_founding_traits():
+    """Bootstrap should seed self_model beliefs from constitution founding traits."""
+    data = json.loads((FIXTURES / "synthetic_day.json").read_text())["seed_state"]
+    state = AgentState.model_validate(data)
+
+    assert len(state.self_model.beliefs) == len(state.persona.founding_traits)
+    for belief, trait in zip(state.self_model.beliefs, state.persona.founding_traits):
+        assert belief.statement == trait.statement
+        assert belief.confidence == trait.initial_confidence
+        assert belief.source_type == "CONST_SEED"
+
 def test_drive_bounds_enforced():
     """Pydantic should reject drive values outside [0, 1]."""
     data = json.loads((FIXTURES / "sample_state.json").read_text())

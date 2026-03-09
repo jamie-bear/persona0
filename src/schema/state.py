@@ -6,7 +6,7 @@ Reference: architecture.md §3 (canonical state schema), self_editability_policy
 from __future__ import annotations
 
 from typing import Annotated, List, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -56,6 +56,13 @@ class SafetyState(BaseModel):
     """ISO8601 timestamp of last disclosure shown to user."""
 
 
+class FoundingTraitSeed(BaseModel):
+    """Initial self-belief seed loaded from persona constitution."""
+
+    statement: str
+    initial_confidence: Annotated[float, Field(ge=0.0, le=1.0)] = 0.55
+
+
 class PersonaConstitution(BaseModel):
     """CONST persona fields. Set at bootstrap; read-only at runtime.
 
@@ -67,7 +74,7 @@ class PersonaConstitution(BaseModel):
     primary_language: str = "en"
     core_values: List[str] = Field(default_factory=list)
     hard_limits: List[str] = Field(default_factory=list)
-    founding_traits: List[str] = Field(default_factory=list)
+    founding_traits: List[FoundingTraitSeed] = Field(default_factory=list)
     voice_style: dict = Field(default_factory=dict)
     disclosure_policy: dict = Field(default_factory=dict)
     privacy_tier_defaults: dict = Field(default_factory=dict)
@@ -153,6 +160,28 @@ class AgentState(BaseModel):
     state_schema_version: str = "0.1"
     tick_counter: int = 0
     """Monotonically incrementing tick counter. Used by desire age tracking."""
+
+    def seed_self_beliefs_from_constitution(self, overwrite_existing: bool = False) -> None:
+        """Bootstrap self-model beliefs from CONST founding traits."""
+        if self.self_model.beliefs and not overwrite_existing:
+            return
+
+        self.self_model.beliefs = [
+            SelfBelief(
+                id=f"const-seed-{index:03d}",
+                statement=trait.statement,
+                confidence=trait.initial_confidence,
+                source_type="CONST_SEED",
+            )
+            for index, trait in enumerate(self.persona.founding_traits, start=1)
+        ]
+
+    @model_validator(mode="after")
+    def _bootstrap_constitution_beliefs(self) -> "AgentState":
+        """Seed beliefs from constitution traits when a bootstrap payload omits beliefs."""
+        if self.persona.founding_traits and not self.self_model.beliefs:
+            self.seed_self_beliefs_from_constitution()
+        return self
 
     def active_goals(self) -> List[GoalRecord]:
         return [g for g in self.goals if g.status == "active"]
