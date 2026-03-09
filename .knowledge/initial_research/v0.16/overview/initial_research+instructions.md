@@ -1,4 +1,4 @@
-# Persona0 Research Synthesis and Build Instructions (v0.15)
+# Persona0 Research Synthesis and Build Instructions (v0.16)
 
 This file consolidates project understanding, identifies technical/strategic errors in v0.1 research artifacts, and defines a cleaner execution path.
 
@@ -58,10 +58,11 @@ Use a strict layered model:
 4. **Governance envelope** (policy + disclosure + audit)
 
 Reference companion docs:
-* `architecture.md`
-* `ego_data.md`
-* `cognitive_loop.md`
-* `action_plan.md`
+* `.knowledge/initial_research/v0.16/overview/initial_research+instructions.md`
+* `.knowledge/initial_research/v0.16/architecture.md`
+* `.knowledge/initial_research/v0.16/ego_data.md`
+* `.knowledge/initial_research/v0.16/cognitive_loop.md`
+* `.knowledge/initial_research/v0.16/action_plan.md`
 
 ---
 
@@ -93,3 +94,4 @@ Require all of:
 * memory retention policy (`memory_lifecycle.md`)
 * adversarial scenario pack (`eval/adversarial_scenarios.md`)
 * benchmark harness spec (`eval/continuity_benchmark.md`)
+.knowledge/initial_research/v0.16/action_plan.md
