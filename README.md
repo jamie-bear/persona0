@@ -1,4 +1,4 @@
-**Persona0** is a design for an ego-perspective cognitive agent architecture, not a prompt-only chatbot.
+**Persona0** is a design for an ego-perspective cognitive agent architecture.
 
 ---
 
