@@ -153,6 +153,15 @@ class AgentState(BaseModel):
     active_desires: List[dict] = Field(default_factory=list)
     """Ephemeral desire objects for current tick. Never persisted."""
 
+    persisted_desires: List[dict] = Field(default_factory=list)
+    """Desires carried between slow ticks for crystallization tracking.
+    NOT cleared by clear_ephemeral() — managed by DriveModule.
+    Cleared at nightly macro cycle. Never written to episodic log."""
+
+    consecutive_thought_categories: List[str] = Field(default_factory=list)
+    """Last N thought categories generated, for the 3-consecutive guardrail.
+    Capped at length 3. Cleared at macro cycle."""
+
     # Safety / governance
     safety: SafetyState = Field(default_factory=SafetyState)
 
