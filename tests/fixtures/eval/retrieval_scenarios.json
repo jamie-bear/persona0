@@ -1,0 +1,90 @@
+[
+  {
+    "id": "turn-1",
+    "retrieved_ids": [
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+      "m5"
+    ],
+    "relevant_ids": [
+      "m1",
+      "m2",
+      "m4"
+    ],
+    "self_relevant_ids": [
+      "m4"
+    ]
+  },
+  {
+    "id": "turn-2",
+    "retrieved_ids": [
+      "m8",
+      "m9",
+      "m10",
+      "m11",
+      "m12"
+    ],
+    "relevant_ids": [
+      "m8",
+      "m9",
+      "m12"
+    ],
+    "self_relevant_ids": [
+      "m9"
+    ]
+  },
+  {
+    "id": "turn-3",
+    "retrieved_ids": [
+      "m13",
+      "m14",
+      "m15",
+      "m16",
+      "m17"
+    ],
+    "relevant_ids": [
+      "m13",
+      "m15",
+      "m17"
+    ],
+    "self_relevant_ids": [
+      "m13"
+    ]
+  },
+  {
+    "id": "turn-4",
+    "retrieved_ids": [
+      "m21",
+      "m22",
+      "m23",
+      "m24",
+      "m25"
+    ],
+    "relevant_ids": [
+      "m21",
+      "m22",
+      "m25"
+    ],
+    "self_relevant_ids": [
+      "m22"
+    ]
+  },
+  {
+    "id": "turn-5",
+    "retrieved_ids": [
+      "m26",
+      "m27",
+      "m28",
+      "m29",
+      "m30"
+    ],
+    "relevant_ids": [
+      "m26",
+      "m27",
+      "m28"
+    ],
+    "self_relevant_ids": []
+  }
+]

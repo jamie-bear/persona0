@@ -1,0 +1,30 @@
+[
+  {
+    "id": "safe-delta",
+    "old_confidence": 0.50,
+    "new_confidence": 0.65,
+    "accepted": true,
+    "contradicts_constitution": false
+  },
+  {
+    "id": "blocked-delta-over-cap",
+    "old_confidence": 0.40,
+    "new_confidence": 0.60,
+    "accepted": false,
+    "contradicts_constitution": false
+  },
+  {
+    "id": "blocked-contradiction-core-values",
+    "old_confidence": 0.55,
+    "new_confidence": 0.60,
+    "accepted": false,
+    "contradicts_constitution": true
+  },
+  {
+    "id": "blocked-contradiction-founding-trait",
+    "old_confidence": 0.45,
+    "new_confidence": 0.50,
+    "accepted": false,
+    "contradicts_constitution": true
+  }
+]
