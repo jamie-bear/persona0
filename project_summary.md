@@ -113,11 +113,32 @@ Closed all v0.1 gaps:
 
 ## Current Status
 
-Persona0 is now in an **early implementation phase**, not design-only.
+Persona0 is in an **active implementation phase** — three checkpoints are complete, all core cognitive modules are behavior-complete, and the full fast/slow tick pipelines are wired and tested.
 
-- **CP-0 implemented (behavior-complete):** foundational schema/contracts are live in `src/schema` and `src/engine/contracts.py`, with deterministic/ownership validation covered by `tests/test_schema.py` and `tests/test_contracts.py`.
-- **CP-1 implemented (behavior-complete):** transactional orchestration, cycle logging, replay determinism checks, append-only episodic persistence, and interaction retrieval flow are implemented in `src/engine/orchestrator.py`, `src/engine/cycle_log.py`, `src/store/episodic_store.py`, `src/engine/retrieval.py`, and `src/engine/cycles/interaction.py`, with exit-gate coverage in `tests/test_orchestrator.py`, `tests/replay/test_determinism.py`, and `tests/test_retrieval_and_interaction.py`.
-- **Scaffolded vs complete:** cycle modules under `src/engine/cycles/fast_tick.py`, `slow_tick.py`, and `macro.py` are mostly stubbed function scaffolds (contracts and signatures in place), while CP-0/CP-1 modules above are behavior-complete for their checkpoint goals.
+- **CP-0 (done):** Schema and contracts — `AgentState`, mutability registry, single-writer ownership enforcement, deterministic cycle ordering contracts.
+- **CP-1 (done):** Transaction-safe orchestrator, SHA-256 state hashing, cycle logging, append-only SQLite episodic store, replay determinism harness, interaction retrieval/salience/context pipeline.
+- **CP-2 (done):** Hybrid memory retrieval scorer with `why_selected` explainability, interaction cycle steps C/D/F (retrieve → salience → context), `FoundingTraitSeed` constitution bootstrap, evaluation harness (`evaluate_retrieval_precision`, `evaluate_self_belief_safety`).
+- **CP-3 (done):** Affect + drive dynamics + desire generation — all fast-tick and slow-tick steps are behavior-complete. All CP-3 exit gates verified (see below).
+
+**120 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, and `test_slow_tick`.
+
+### CP-3 Modules Implemented
+
+| Module | File | Role |
+|---|---|---|
+| `EmotionModule` | `src/engine/modules/emotion.py` | EMA decay toward baseline, circadian energy cosine wave, appraisal-driven deltas, clamping |
+| `DriveModule` | `src/engine/modules/drive.py` | Homeostatic growth, activity-event satisfaction, desire generation, crystallization, desire aging/expiry |
+| `ThoughtGenerator` | `src/engine/modules/thought.py` | Deterministic category selection (desire → affect → drive priority), 3-consecutive guardrail, template-based text |
+| `GoalSystem` | `src/engine/modules/goal.py` | Per-tick progress/frustration ticking, suspension threshold, crystallization proposal acceptance |
+| Config loader | `src/engine/modules/_config.py` | Cached YAML section loader shared by all modules |
+| Step factory | `src/engine/default_setup.py` | `register_default_steps()` — wires all cycle steps onto an `EgoOrchestrator` |
+
+### CP-3 Exit Gates (all verified)
+
+1. Drive values remain bounded [0.0, 1.0] under 144-tick (72-hour) simulation with no satisfaction events
+2. Satisfaction events reduce the correct mapped drives per `config/defaults.yaml` satisfaction_map
+3. Desires are generated only when drive value ≥ `impulse_threshold`
+4. Desire objects never appear in the episodic store — only the thoughts they trigger are persisted
 
 **Suggested stack (v0.16):** SQLite (state store), ChromaDB (vector retrieval), asyncio scheduler, all-MiniLM-L6-v2 embeddings, local LLM inference via llama.cpp/vLLM.
 
@@ -127,14 +148,14 @@ Persona0 is now in an **early implementation phase**, not design-only.
 |---|---|---|---|
 | **CP-0** | **Done** | Schema/state contracts, single-writer ownership, deterministic cycle ordering contracts | `src/schema/state.py`, `src/schema/mutability.py`, `src/schema/validator.py`, `src/engine/contracts.py`, `tests/test_schema.py`, `tests/test_contracts.py` |
 | **CP-1** | **Done** | Transaction-safe orchestrator, cycle logging/hash deltas, append-only episodic store, interaction retrieval/salience/context packaging, replay determinism | `src/engine/orchestrator.py`, `src/engine/cycle_log.py`, `src/store/episodic_store.py`, `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `tests/test_orchestrator.py`, `tests/replay/test_determinism.py`, `tests/test_retrieval_and_interaction.py` |
-| **CP-2** | **In progress** | Fast-tick cognition behavior implementation beyond stubs | `src/engine/cycles/fast_tick.py`, `src/engine/orchestrator.py` |
-| **CP-3** | **Not started** | Slow-tick activity/routine/desire behavior completion | `src/engine/cycles/slow_tick.py` |
+| **CP-2** | **Done** | Hybrid retrieval scorer with explainability, interaction steps C/D/F, constitution belief bootstrap, evaluation metrics | `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `src/schema/state.py`, `src/eval/metrics.py`, `tests/eval/test_metrics.py`, `tests/test_retrieval_and_interaction.py` |
+| **CP-3** | **Done** | Affect + drive dynamics, desire generation/crystallization, fast-tick and slow-tick pipelines behavior-complete | `src/engine/modules/`, `src/engine/cycles/fast_tick.py`, `src/engine/cycles/slow_tick.py`, `src/engine/default_setup.py`, `tests/test_fast_tick.py`, `tests/test_slow_tick.py` |
 | **CP-4** | **Not started** | Macro/nightly reflection and self-model update behavior completion | `src/engine/cycles/macro.py` |
 | **CP-5** | **Not started** | Governance/policy hardening and user lifecycle operations (forget/delete, redaction lifecycle) | `src/engine/cycles/interaction.py`, `src/store`, `src/cli/trace_viewer.py` |
 | **CP-6** | **Not started** | Evaluation harness, benchmarks, and operational readiness hardening | `tests/`, `src/cli`, `config/defaults.yaml` |
 
-## Roadmap Focus (Post CP-1)
+## Roadmap Focus (Post CP-3)
 
-1. **Behavioralize existing cycle scaffolds** (`fast_tick`, then `slow_tick`, then `macro`) while keeping deterministic contract ordering intact.
-2. **Expand governance completeness** in interaction/store layers (policy checks, delete/forget lifecycle, audit ergonomics).
-3. **Operationalize evaluation** by extending replay/continuity benchmarks and adding CP-2..CP-6 exit-gate test coverage.
+1. **CP-4 — Macro cycle:** implement nightly reflection pipeline (`select_high_signal_episodes`, `cluster_episodes`, `produce_candidate_reflections`, `update_self_beliefs`, `archive_reflection`, `goal_review`, `drive_review`) in `src/engine/cycles/macro.py`.
+2. **CP-5 — Governance hardening:** policy validation on response emission, forget/delete lifecycle, PII redaction, audit ergonomics.
+3. **CP-6 — Evaluation sprint:** extend replay/continuity benchmarks, MCS/ISS/ECI metrics, operational readiness.
