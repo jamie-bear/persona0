@@ -150,6 +150,17 @@ def test_cycle_log_before_after_hash_populated(tmp_path):
     assert len(entries[0].before_state_hash) == 64  # SHA-256 hex
 
 
+def test_cycle_log_after_hash_matches_post_cycle_state(tmp_path):
+    """after_state_hash must match orchestrator state after run_cycle returns."""
+    orch, logger, _ = _make_orchestrator(tmp_path)
+
+    orch.run_cycle(CycleType.FAST_TICK)
+
+    entries = logger.read_all()
+    assert len(entries) == 1
+    assert entries[0].after_state_hash == hash_state(orch.state)
+
+
 def test_rollback_entry_before_equals_after_hash(tmp_path):
     """On rollback, before_state_hash must equal after_state_hash (no change)."""
     orch, logger, _ = _make_orchestrator(tmp_path)
