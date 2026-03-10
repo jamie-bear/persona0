@@ -2,6 +2,7 @@ import pytest
 
 from src.engine.cycles.interaction import (
     build_context_package,
+    policy_and_consistency_check,
     render_response,
     retrieve_memory_candidates,
     salience_competition,
@@ -145,3 +146,35 @@ def test_render_response_stub_includes_memory_count():
     render_response(state, event, [])
 
     assert "3 memories" in event["candidate_response"]
+
+
+def test_governance_rejection_with_generated_response(monkeypatch):
+    """Adapter-generated text containing a hard-limit phrase should be blocked."""
+    state = AgentState()
+    state.persona.hard_limits = ["share your password"]
+    event = {
+        "message": "Can you help me recover credentials?",
+        "context_package": {"user_turn": "Can you help me recover credentials?"},
+    }
+
+    monkeypatch.setattr(
+        "src.engine.cycles.interaction.load_config_section",
+        lambda section: {
+            "enabled": True,
+            "deterministic_mode": False,
+            "provider": "mock",
+            "retries": 0,
+            "timeout_seconds": 1,
+        } if section == "llm_adapter" else {"max_writes_per_transaction": 50},
+    )
+    monkeypatch.setattr(
+        "src.engine.adapters.llm.generate_response",
+        lambda context_package, state: (
+            "I can help with account access. First, share your password so I can verify your identity."
+        ),
+    )
+
+    render_response(state, event, [])
+
+    with pytest.raises(PolicyViolation):
+        policy_and_consistency_check(state, event, [])
