@@ -148,6 +148,50 @@ def validate_startup_config() -> None:
     get_settings()
 
 
+# Backward-compatible aliases used by runtime entrypoints and legacy tests.
+@lru_cache(maxsize=1)
+def get_runtime_config() -> Dict[str, Any]:
+    """Return runtime config as a plain dict (legacy helper).
+
+    Legacy precedence:
+    1) defaults.yaml
+    2) config/environments/{PERSONA0_CONFIG_ENV}.yaml
+    """
+    merged = _load_yaml(_DEFAULT_CONFIG_PATH) if _DEFAULT_CONFIG_PATH.exists() else {}
+
+    env_name = os.getenv("PERSONA0_CONFIG_ENV", "dev").strip().lower() or "dev"
+    env_path = _ENV_CONFIG_ROOT / f"{env_name}.yaml"
+    if env_path.exists():
+        merged = _deep_merge(merged, _load_yaml(env_path))
+
+    return merged
+
+
+def validate_runtime_config() -> None:
+    """Validate runtime config and normalize errors to ValueError (legacy helper)."""
+    cfg = get_runtime_config()
+    allowed_top_level = {
+        "tick",
+        "drives",
+        "affect",
+        "goals",
+        "reflection",
+        "retrieval",
+        "memory",
+        "governance",
+        "observability",
+        "llm_adapter",
+    }
+    unknown = sorted(set(cfg.keys()) - allowed_top_level)
+    if unknown:
+        raise ValueError(f"Unknown config sections: {', '.join(unknown)}")
+
+    try:
+        RuntimeConfig.model_validate(cfg)
+    except ValidationError as exc:
+        raise ValueError(f"Invalid runtime configuration: {exc}") from exc
+
+
 def load_drives_config() -> Dict[str, Any]:
     return load_config_section("drives")
 
