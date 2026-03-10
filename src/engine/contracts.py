@@ -58,6 +58,7 @@ DECAY_UNREINFORCED_BELIEFS = "decay_unreinforced_beliefs"
 ARCHIVE_REFLECTION = "archive_reflection"
 GOAL_REVIEW = "goal_review"
 DRIVE_REVIEW = "drive_review"
+COMPACT_EPISODIC_MEMORY = "compact_episodic_memory"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ MACRO_STEPS: List[str] = [
     ARCHIVE_REFLECTION,
     GOAL_REVIEW,
     DRIVE_REVIEW,
+    COMPACT_EPISODIC_MEMORY,
     LOG_CYCLE,
 ]
 

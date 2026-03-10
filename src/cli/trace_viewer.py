@@ -38,6 +38,20 @@ def _format_delta(delta: dict) -> str:
     return "\n".join(lines[:5])  # cap at 5 lines for readability
 
 
+def _format_policy(summary: dict) -> str:
+    if not summary:
+        return "[dim]—[/dim]"
+
+    blocked = int(summary.get("blocked", 0))
+    warnings = int(summary.get("warnings", 0))
+    if blocked > 0:
+        cats = ", ".join(summary.get("block_categories", [])[:3])
+        return f"[red]blocked={blocked}[/red]\n[dim]{cats}[/dim]"
+    if warnings > 0:
+        return f"[yellow]warnings={warnings}[/yellow]"
+    return "[green]pass[/green]"
+
+
 def render_log(log_path: Path) -> None:
     if not log_path.exists():
         console.print(f"[red]File not found:[/red] {log_path}")
@@ -72,6 +86,7 @@ def render_log(log_path: Path) -> None:
     table.add_column("Before hash", style="dim", width=14)
     table.add_column("After hash", style="dim", width=14)
     table.add_column("Status", width=16)
+    table.add_column("Policy", width=24)
     table.add_column("Delta (top 5 fields)", overflow="fold")
 
     for i, entry in enumerate(entries, 1):
@@ -90,6 +105,7 @@ def render_log(log_path: Path) -> None:
             _short_hash(entry.get("before_state_hash", "")),
             _short_hash(entry.get("after_state_hash", "")),
             status_str,
+            _format_policy(entry.get("policy_check_result") or {}),
             _format_delta(entry.get("delta", {})),
         )
 
