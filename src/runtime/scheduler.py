@@ -11,7 +11,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 from ..engine.contracts import CycleType
 from ..engine.default_setup import register_default_steps
 from ..engine.orchestrator import EgoOrchestrator
-from ..engine.modules._config import load_tick_config
+from ..engine.modules._config import load_tick_config, validate_startup_config
 from ..schema.state import AgentState
 
 
@@ -214,6 +214,7 @@ def _utc_now() -> str:
 
 
 def build_runtime_scheduler(state: Optional[AgentState] = None, store: Any = None) -> RuntimeScheduler:
+    validate_startup_config()
     state = state or AgentState()
     orchestrator = register_default_steps(EgoOrchestrator(state), store=store)
     startup_hooks: List[Hook] = []

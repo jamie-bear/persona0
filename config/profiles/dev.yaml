@@ -1,0 +1,8 @@
+llm_adapter:
+  enabled: false
+  provider: mock
+  model: mock-chat-v1
+  deterministic_mode: true
+
+governance:
+  enforcement_mode: audit

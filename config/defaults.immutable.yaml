@@ -1,0 +1,212 @@
+# Persona0 Default Configuration
+# Version: 0.1
+# Purpose: all tunable parameters consumed by the Ego Engine at bootstrap
+# Mutability: EXT — operator-editable at deploy time; not modifiable at runtime by agent
+# Reference: drive_system.md §3, §5; cognitive_loop.md §3; self_editability_policy.md §3.2
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TICK CADENCES
+# ─────────────────────────────────────────────────────────────────────────────
+tick:
+  fast_interval_seconds: 1800     # 30 minutes
+  slow_interval_seconds: 10800    # 3 hours (within 2–4 hr window)
+  macro_interval_seconds: 86400   # 24 hours (nightly)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DRIVE SYSTEM
+# ─────────────────────────────────────────────────────────────────────────────
+drives:
+  # Natural growth rate per drive per fast tick (bounded [0.0, 1.0])
+  growth_rate:
+    social_need: 0.04
+    mastery_need: 0.02
+    rest_need: 0.03
+    curiosity: 0.01
+
+  # Drive value at which a desire object is generated (slow tick)
+  impulse_threshold:
+    social_need: 0.65
+    mastery_need: 0.70
+    rest_need: 0.70
+    curiosity: 0.75
+
+  # Drive satisfaction map: reduction applied per qualifying activity event
+  satisfaction_map:
+    social_need:
+      satisfied_by: [conversation, social_activity, group_event]
+      reduction_per_event: 0.25
+    mastery_need:
+      satisfied_by: [goal_progress, task_completion, learning_episode]
+      reduction_per_event: 0.20
+    rest_need:
+      satisfied_by: [sleep, low_arousal_idle_period]
+      reduction_per_event: 0.40
+    curiosity:
+      satisfied_by: [reading, exploring_topic, creative_activity]
+      reduction_per_event: 0.30
+
+  # Drive → Goal crystallization rules
+  crystallization_threshold_ticks: 6     # ~3 hours at slow-tick cadence
+  crystallization_urgency_min: 0.65      # minimum desire.urgency to crystallize
+  max_proposals_per_drive_per_tick: 1
+
+  # Desire persistence: desires above this urgency carry to next slow tick
+  persistence_threshold: 0.50
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AFFECT DYNAMICS
+# ─────────────────────────────────────────────────────────────────────────────
+affect:
+  # Resting / baseline values (returned to by decay)
+  baseline:
+    valence: 0.10
+    arousal: 0.30
+    stress: 0.10
+    energy: 0.70
+
+  # Per-tick decay rate toward baseline (EMA coefficient)
+  decay_rate:
+    valence: 0.05
+    arousal: 0.08
+    stress: 0.06
+    energy: 0.04
+
+  # Bounds for all affect variables
+  bounds:
+    min: -1.0
+    max: 1.0
+
+  # Circadian modulation: energy peaks and troughs (hour of day, 24h)
+  circadian:
+    energy_peak_hour: 10
+    energy_trough_hour: 15
+    energy_modulation_amplitude: 0.15
+
+  # Stress cap — stress above this level triggers rest_need growth acceleration
+  stress_high_threshold: 0.70
+  stress_rest_need_boost: 0.01   # additional rest_need growth per tick above threshold
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GOAL SYSTEM
+# ─────────────────────────────────────────────────────────────────────────────
+goals:
+  # Goal frustration accumulates if progress stalls; triggers suspension
+  frustration_threshold_suspension: 0.75
+  frustration_growth_per_stalled_tick: 0.05
+  frustration_decay_per_progressing_tick: 0.10
+
+  # Goal priority dampening for crystallized goals (desires feel more urgent than goals start)
+  crystallization_priority_dampen: 0.60   # new_goal.priority = desire.urgency * dampen
+
+  # Maximum active goals at any time
+  max_active_goals: 8
+
+  # Daily goal review: goals inactive for this many days may be archived
+  goal_staleness_days: 30
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REFLECTION POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+reflection:
+  # Maximum confidence delta per macro-cycle
+  max_confidence_delta_per_cycle: 0.15
+
+  # Minimum independent reflections before confidence may exceed this threshold
+  high_confidence_threshold: 0.75
+  high_confidence_min_reflections: 2
+
+  # Maximum new self-belief statements per macro-cycle
+  max_new_statements_per_cycle: 3
+
+  # Confidence decay for unreinforced beliefs (no supporting episode in N days)
+  confidence_decay_rate_per_cycle: 0.02
+  confidence_decay_threshold_days: 14    # begin decay after 14 days without reinforcement
+
+  # Archival trigger: beliefs below this confidence level move to cooling
+  confidence_archival_threshold: 0.15
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RETRIEVAL & CONTEXT ASSEMBLY
+# ─────────────────────────────────────────────────────────────────────────────
+retrieval:
+  # Hybrid retrieval weights (must sum to 1.0)
+  recency_weight: 0.30
+  importance_weight: 0.25
+  semantic_similarity_weight: 0.30
+  self_relevance_weight: 0.15
+  # DEPRECATED: legacy alias kept for backward compatibility; prefer self_relevance_weight.
+  goal_relevance_weight: 0.15
+
+  # Maximum candidates before salience competition
+  candidate_limit: 20
+
+  # Salience buffer capacity (items entering context package)
+  salience_buffer_capacity: 5
+
+  # Minimum importance score for a record to be retrieved
+  min_importance_threshold: 0.15
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MEMORY LIFECYCLE
+# ─────────────────────────────────────────────────────────────────────────────
+memory:
+  # Episodic record decay
+  decay_rate_per_cycle: 0.005       # ~1% per week at nightly cadence
+  decay_cooling_threshold: 0.10    # records below this flagged for cooling
+
+  # Importance thresholds
+  importance_cooling_threshold: 0.15
+  importance_cooling_cycles: 3      # must be below threshold for N macro-cycles
+
+  # Nightly compaction caps
+  max_records_cooled_per_cycle: 100
+  max_records_archived_per_cycle: 50
+
+  # Guardrails on synthetic content generation
+  max_episodes_generated_per_day: 24
+  max_consecutive_same_category_thoughts: 3
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MUTABILITY ENFORCEMENT
+# ─────────────────────────────────────────────────────────────────────────────
+governance:
+  # Enforcement mode: strict = reject and rollback; audit = log only (dev mode)
+  enforcement_mode: strict
+
+  # Whether to hard-fail on any CONST write attempt (always true in production)
+  const_write_hard_fail: true
+
+  # Audit log retention (days)
+  audit_log_retention_days: 365
+
+  # Maximum write fields per transaction (safety cap)
+  max_writes_per_transaction: 50
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OBSERVABILITY
+# ─────────────────────────────────────────────────────────────────────────────
+observability:
+  cycle_log_format: jsonl            # jsonl | sqlite
+  cycle_log_max_size_mb: 100
+  cycle_log_rotation: daily
+
+  # State snapshot granularity
+  emit_full_state_snapshot: false    # true emits full state per cycle (verbose); false emits deltas only
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM ADAPTER
+# ─────────────────────────────────────────────────────────────────────────────
+llm_adapter:
+  # Toggle external adapter calls for interaction rendering and fast-tick appraisal
+  enabled: false
+
+  # Provider/model selection used by src/engine/adapters/llm.py
+  provider: mock
+  model: mock-chat-v1
+
+  # Request behavior controls
+  timeout_seconds: 2
+  retries: 1
+
+  # Explicit dev/test fallback switch for deterministic offline runs
+  deterministic_mode: true

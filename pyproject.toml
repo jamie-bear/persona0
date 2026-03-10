@@ -9,6 +9,7 @@ description = "Ego Engine — external cognitive runtime for persistent LLM iden
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.5",
+    "pydantic-settings>=2.2",
     "pyyaml>=6.0",
     "rich>=13.0",
 ]
