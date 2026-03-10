@@ -32,6 +32,7 @@ from .contracts import (
     CLUSTER_EPISODES,
     PRODUCE_CANDIDATE_REFLECTIONS,
     UPDATE_SELF_BELIEFS,
+    DECAY_UNREINFORCED_BELIEFS,
     ARCHIVE_REFLECTION,
     GOAL_REVIEW,
     DRIVE_REVIEW,
@@ -114,6 +115,7 @@ def register_default_steps(
     orchestrator.register_step(PRODUCE_CANDIDATE_REFLECTIONS, macro.produce_candidate_reflections)
     orchestrator.register_step(SCORE_EVIDENCE_SUFFICIENCY, macro.score_evidence_sufficiency)
     orchestrator.register_step(UPDATE_SELF_BELIEFS, macro.update_self_beliefs)
+    orchestrator.register_step(DECAY_UNREINFORCED_BELIEFS, macro.decay_unreinforced_beliefs)
     orchestrator.register_step(ARCHIVE_REFLECTION, macro.archive_reflection)
     orchestrator.register_step(GOAL_REVIEW, macro.goal_review)
     orchestrator.register_step(DRIVE_REVIEW, macro.drive_review)

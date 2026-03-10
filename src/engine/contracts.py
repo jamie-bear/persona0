@@ -54,6 +54,7 @@ CLUSTER_EPISODES = "cluster_episodes"
 PRODUCE_CANDIDATE_REFLECTIONS = "produce_candidate_reflections"
 SCORE_EVIDENCE_SUFFICIENCY = "score_evidence_sufficiency"
 UPDATE_SELF_BELIEFS = "update_self_beliefs"
+DECAY_UNREINFORCED_BELIEFS = "decay_unreinforced_beliefs"
 ARCHIVE_REFLECTION = "archive_reflection"
 GOAL_REVIEW = "goal_review"
 DRIVE_REVIEW = "drive_review"
@@ -110,6 +111,7 @@ MACRO_STEPS: List[str] = [
     PRODUCE_CANDIDATE_REFLECTIONS,
     SCORE_EVIDENCE_SUFFICIENCY,
     UPDATE_SELF_BELIEFS,
+    DECAY_UNREINFORCED_BELIEFS,
     ARCHIVE_REFLECTION,
     GOAL_REVIEW,
     DRIVE_REVIEW,
@@ -180,6 +182,7 @@ def validate_step_ordering() -> dict[CycleType, list[str]]:
     # Macro invariants
     m_steps = CYCLE_CONTRACTS[CycleType.MACRO]
     _assert_before(CycleType.MACRO, m_steps, SCORE_EVIDENCE_SUFFICIENCY, UPDATE_SELF_BELIEFS)
-    _assert_before(CycleType.MACRO, m_steps, UPDATE_SELF_BELIEFS, ARCHIVE_REFLECTION)
+    _assert_before(CycleType.MACRO, m_steps, UPDATE_SELF_BELIEFS, DECAY_UNREINFORCED_BELIEFS)
+    _assert_before(CycleType.MACRO, m_steps, DECAY_UNREINFORCED_BELIEFS, ARCHIVE_REFLECTION)
 
     return errors

@@ -24,9 +24,16 @@ def select_high_signal_episodes(
     - event['_macro_source_episodes'] (explicit fixture/testing injection)
     - event['_pending_episodic'] (in-flight episodic records)
     - event['_store'].query(...) when a store is injected
+
+    A recency window (event['_macro_recency_window_hours'], default 72) filters
+    out episodes older than the window when a reference timestamp is available.
     """
     episodes = _load_candidate_episodes(event)
     top_k = int(event.get("_macro_top_k", 12))
+    recency_hours = float(event.get("_macro_recency_window_hours", 72))
+
+    # Apply recency window filter
+    episodes = _filter_by_recency(episodes, recency_hours)
 
     scored = []
     for record in episodes:
@@ -183,6 +190,77 @@ def update_self_beliefs(state: AgentState, event: Dict[str, Any], pending_writes
         pending_writes.append({"field_path": "self_model.beliefs", "author_module": "ReflectionEngine"})
 
 
+def decay_unreinforced_beliefs(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
+    """5b. Decay confidence of beliefs not reinforced within the configured window.
+
+    Reference: config/defaults.yaml reflection.confidence_decay_rate_per_cycle,
+    reflection.confidence_decay_threshold_days, reflection.confidence_archival_threshold
+    """
+    cfg = load_reflection_config()
+    decay_rate = float(cfg.get("confidence_decay_rate_per_cycle", 0.02))
+    threshold_days = int(cfg.get("confidence_decay_threshold_days", 14))
+    archival_threshold = float(cfg.get("confidence_archival_threshold", 0.15))
+
+    # Build set of statements that were just reinforced this cycle
+    reinforced_statements: set = set()
+    for r in event.get("_macro_accepted_reflections", []):
+        stmt = str(r.get("proposed_self_belief_update", "")).strip()
+        if stmt:
+            reinforced_statements.add(stmt)
+
+    # Simulated "now" from tick_counter: each macro cycle ≈ 1 day
+    current_day = state.tick_counter
+
+    changed = False
+    for belief in state.self_model.beliefs:
+        # CONST_SEED beliefs don't decay
+        if belief.source_type == "CONST_SEED":
+            continue
+        # Beliefs reinforced this cycle don't decay
+        if belief.statement in reinforced_statements:
+            continue
+
+        last_ref_day = _last_reinforcement_day(belief, current_day)
+        days_unreinforced = current_day - last_ref_day
+
+        if days_unreinforced < threshold_days:
+            continue
+
+        new_confidence = max(0.0, round(belief.confidence - decay_rate, 4))
+        if new_confidence != belief.confidence:
+            belief.confidence = new_confidence
+            changed = True
+
+    # Track beliefs below archival threshold for observability
+    archival_candidates = [
+        b.id for b in state.self_model.beliefs
+        if b.source_type != "CONST_SEED" and b.confidence < archival_threshold
+    ]
+    event["_macro_archival_candidates"] = archival_candidates
+
+    if changed:
+        pending_writes.append({"field_path": "self_model.beliefs", "author_module": "ReflectionEngine"})
+
+
+def _last_reinforcement_day(belief: SelfBelief, current_day: int) -> int:
+    """Estimate the last reinforcement day from supporting_reflections.
+
+    Reflection IDs follow the pattern 'refl-TTTTTT-NNN' where TTTTTT is the
+    tick_counter at creation time. Falls back to 0 if no reflections exist.
+    """
+    latest = 0
+    for ref_id in belief.supporting_reflections:
+        parts = str(ref_id).split("-")
+        if len(parts) >= 2:
+            try:
+                tick = int(parts[1])
+                if tick > latest:
+                    latest = tick
+            except (ValueError, IndexError):
+                pass
+    return latest
+
+
 def archive_reflection(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
     """6. Archive accepted reflections and produce an audit-friendly payload."""
     accepted = list(event.get("_macro_accepted_reflections", []))
@@ -209,12 +287,54 @@ def archive_reflection(state: AgentState, event: Dict[str, Any], pending_writes:
 
 
 def goal_review(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """7. Goal review summary for macro-cycle observability."""
+    """7. Goal review — staleness check, frustration archival, observability summary.
+
+    Reference: config/defaults.yaml goals.goal_staleness_days
+    """
+    from ..modules._config import load_goals_config
+    goals_cfg = load_goals_config()
+    staleness_days = int(goals_cfg.get("goal_staleness_days", 30))
+    max_active = int(goals_cfg.get("max_active_goals", 8))
+
     active = [g for g in state.goals if g.status == "active"]
+    changed = False
+
+    stale_ids = []
+    abandoned_ids = []
+
+    for goal in state.goals:
+        if goal.status != "active":
+            continue
+
+        # Staleness check: goals created more than staleness_days ticks ago
+        # with no progress are candidates for abandonment
+        if goal.created_at:
+            try:
+                created = datetime.fromisoformat(goal.created_at.replace("Z", "+00:00"))
+                age_days = (datetime.now(timezone.utc) - created).days
+                if age_days >= staleness_days and goal.progress < 0.05:
+                    goal.status = "abandoned"
+                    abandoned_ids.append(goal.id)
+                    changed = True
+                    continue
+            except (ValueError, TypeError):
+                pass
+
+        # High-frustration goals that hit suspension threshold are suspended
+        if goal.frustration >= 0.75 and goal.status == "active":
+            goal.status = "suspended"
+            stale_ids.append(goal.id)
+            changed = True
+
     event["_macro_goal_review"] = {
-        "active_goal_count": len(active),
+        "active_goal_count": len([g for g in state.goals if g.status == "active"]),
         "accepted_reflection_count": len(event.get("_macro_accepted_reflections", [])),
+        "abandoned_goal_ids": abandoned_ids,
+        "suspended_goal_ids": stale_ids,
     }
+
+    if changed:
+        pending_writes.append({"field_path": "goals", "author_module": "GoalSystem"})
 
 
 def drive_review(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -256,6 +376,45 @@ def _load_candidate_episodes(event: Dict[str, Any]) -> List[Dict[str, Any]]:
             return []
 
     return []
+
+
+def _filter_by_recency(
+    episodes: List[Dict[str, Any]], window_hours: float
+) -> List[Dict[str, Any]]:
+    """Filter episodes to those within the recency window.
+
+    Uses the latest created_at among all episodes as the reference point.
+    Episodes without a parseable created_at are kept (fail-open).
+    """
+    if not episodes or window_hours <= 0:
+        return episodes
+
+    # Find the latest timestamp as reference
+    latest_ts = ""
+    for ep in episodes:
+        ts = str(ep.get("created_at", ""))
+        if ts > latest_ts:
+            latest_ts = ts
+
+    if not latest_ts:
+        return episodes
+
+    try:
+        ref = datetime.fromisoformat(latest_ts.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return episodes
+
+    from datetime import timedelta
+    cutoff = ref - timedelta(hours=window_hours)
+    cutoff_iso = cutoff.isoformat()
+
+    filtered = []
+    for ep in episodes:
+        ts = str(ep.get("created_at", ""))
+        if not ts or ts >= cutoff_iso:
+            filtered.append(ep)
+
+    return filtered
 
 
 def _episode_signal_score(record: Dict[str, Any]) -> float:
