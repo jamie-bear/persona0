@@ -21,6 +21,9 @@ _CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 _IMMUTABLE_DEFAULTS_PATH = _CONFIG_DIR / "defaults.immutable.yaml"
 _PROFILES_DIR = _CONFIG_DIR / "profiles"
 
+_CONFIG_ROOT = Path(__file__).resolve().parents[3] / "config"
+_DEFAULT_CONFIG_PATH = _CONFIG_ROOT / "defaults.yaml"
+_ENV_CONFIG_ROOT = _CONFIG_ROOT / "environments"
 
 def _deep_merge(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
     merged = dict(left)

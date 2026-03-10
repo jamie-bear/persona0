@@ -22,6 +22,12 @@ from ..schema.state import AgentState
 from ..schema.validator import validate_const_fields_unchanged, validate_proposed_writes
 from .contracts import CYCLE_CONTRACTS, CycleType
 from .cycle_log import CycleLogEntry, CycleLogger, compute_delta, hash_state
+from .telemetry import (
+    clear_trace_context,
+    default_telemetry,
+    ensure_trace_context,
+    telemetry_labels,
+)
 
 
 class PolicyViolation(Exception):
@@ -89,6 +95,7 @@ class EgoOrchestrator:
         self._logger = logger
         self._registry = registry or DEFAULT_REGISTRY
         self._step_registry: Dict[str, StepFn] = {}
+        self._telemetry = default_telemetry
 
     def register_step(self, step_name: str, fn: StepFn) -> None:
         """Register a step implementation function.
@@ -119,6 +126,7 @@ class EgoOrchestrator:
         timestamp = datetime.now(timezone.utc).isoformat()
         input_event = input_event or {}
         input_event.setdefault("_logical_timestamp", _logical_cycle_timestamp(self.state.tick_counter, cycle_type))
+        trace = ensure_trace_context(input_event)
 
         # Step 1: Snapshot before state
         snapshot = self.state.model_copy(deep=True)
@@ -134,7 +142,11 @@ class EgoOrchestrator:
             for step_name in CYCLE_CONTRACTS[cycle_type]:
                 step_fn = self._step_registry.get(step_name)
                 if step_fn is not None:
-                    step_fn(self.state, input_event, pending_writes)
+                    with self._telemetry.time_block(
+                        "cycle_step_latency_ms",
+                        telemetry_labels({"cycle_type": cycle_type.value, "step": step_name}),
+                    ):
+                        step_fn(self.state, input_event, pending_writes)
                 modules_executed.append(step_name)
 
             # Step 3: Validate proposed writes
@@ -163,6 +175,12 @@ class EgoOrchestrator:
             delta = compute_delta(snapshot, self.state)
 
             duration_ms = int((time.monotonic() - start_ts) * 1000)
+            self._telemetry.increment("cycle_total")
+            self._telemetry.observe_ms(
+                "cycle_latency_ms",
+                duration_ms,
+                telemetry_labels({"cycle_type": cycle_type.value}),
+            )
             entry = self._build_log_entry(
                 cycle_id=cycle_id,
                 cycle_type=cycle_type,
@@ -177,6 +195,9 @@ class EgoOrchestrator:
                 policy_check_result=input_event.get("_policy_check_result"),
                 rollback=False,
                 duration_ms=duration_ms,
+                correlation_id=trace.correlation_id,
+                request_id=trace.request_id,
+                session_id=trace.session_id,
             )
             if self._logger:
                 self._logger.append(entry)
@@ -197,6 +218,13 @@ class EgoOrchestrator:
 
             duration_ms = int((time.monotonic() - start_ts) * 1000)
             rollback_reason = str(exc)
+            self._telemetry.increment("cycle_total")
+            self._telemetry.increment("cycle_rollback_total")
+            self._telemetry.observe_ms(
+                "cycle_latency_ms",
+                duration_ms,
+                telemetry_labels({"cycle_type": cycle_type.value, "status": "rollback"}),
+            )
             entry = self._build_log_entry(
                 cycle_id=cycle_id,
                 cycle_type=cycle_type,
@@ -212,6 +240,9 @@ class EgoOrchestrator:
                 rollback=True,
                 rollback_reason=rollback_reason,
                 duration_ms=duration_ms,
+                correlation_id=trace.correlation_id,
+                request_id=trace.request_id,
+                session_id=trace.session_id,
             )
             if self._logger:
                 self._logger.append(entry)
@@ -223,6 +254,8 @@ class EgoOrchestrator:
                 rollback_reason=rollback_reason,
                 duration_ms=duration_ms,
             )
+        finally:
+            clear_trace_context()
 
     def _restore_state_in_place(self, snapshot: AgentState) -> None:
         """Restore current state values from snapshot while preserving object identity."""
@@ -245,6 +278,9 @@ class EgoOrchestrator:
         policy_check_result: Optional[Dict[str, Any]],
         rollback: bool,
         duration_ms: int,
+        correlation_id: str,
+        request_id: Optional[str],
+        session_id: Optional[str],
         rollback_reason: Optional[str] = None,
     ) -> CycleLogEntry:
         return CycleLogEntry(
@@ -262,4 +298,7 @@ class EgoOrchestrator:
             rollback=rollback,
             rollback_reason=rollback_reason,
             duration_ms=duration_ms,
+            correlation_id=correlation_id,
+            request_id=request_id,
+            session_id=session_id,
         )

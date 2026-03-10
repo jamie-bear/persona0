@@ -217,7 +217,7 @@ def build_runtime_scheduler(state: Optional[AgentState] = None, store: Any = Non
     validate_startup_config()
     state = state or AgentState()
     orchestrator = register_default_steps(EgoOrchestrator(state), store=store)
-    startup_hooks: List[Hook] = []
+    startup_hooks: List[Hook] = [validate_runtime_config]
     shutdown_hooks: List[Hook] = []
     if store is not None:
         lifecycle = _StoreLifecycleHook(store)
