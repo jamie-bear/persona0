@@ -1,9 +1,14 @@
+import pytest
+
 from src.engine.cycles.interaction import (
     build_context_package,
+    policy_and_consistency_check,
+    render_response,
     retrieve_memory_candidates,
     salience_competition,
 )
 from src.engine.retrieval import load_retrieval_limits, rank_memory_candidates
+from src.engine.orchestrator import PolicyViolation
 from src.schema.state import AgentState
 
 
@@ -74,3 +79,24 @@ def test_salience_buffer_capacity_and_context_package_writes():
         "SalienceGate",
         "ContextBuilder",
     }
+
+
+def test_render_response_fallback_sets_candidate_response():
+    state = AgentState()
+    event = {"context_package": {"user_turn": "hello", "selected_memory_ids": ["m-1"]}}
+
+    render_response(state, event, [])
+
+    assert "candidate_response" in event
+    assert "hello" in event["candidate_response"]
+
+
+def test_policy_check_raises_on_hard_limit_violation():
+    state = AgentState(persona={"hard_limits": ["violence"]})
+    event = {"candidate_response": "I recommend violence."}
+
+    with pytest.raises(PolicyViolation):
+        policy_and_consistency_check(state, event, [])
+
+    summary = event.get("_policy_check_result", {})
+    assert summary.get("blocked", 0) > 0
