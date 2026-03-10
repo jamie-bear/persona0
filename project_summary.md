@@ -113,15 +113,25 @@ Closed all v0.1 gaps:
 
 ## Current Status
 
-Persona0 is in an **active implementation phase** — CP-0 through CP-5 are complete, and CP-6 evaluation is well underway. All four cognitive cycle types (interaction, fast, slow, macro) have behavior-complete step implementations with full test coverage.
+Persona0 has a **deterministic core implemented and validated** (CP-0 through CP-6 for non-LLM behavior), with **LLM-dependent interaction logic still stubbed**.
+
+- **Implemented deterministic pipeline components:** state schema/contracts, orchestrator transaction semantics, retrieval ranking/salience/context packaging, affect/drive/goal dynamics, macro reflection, governance + PII safeguards, and evaluation metrics/replay harness.
+- **Pending LLM-dependent/no-op placeholders:** specific interaction/fast-tick steps are intentionally left as stubs until an LLM adapter is wired.
 
 - **CP-0 (done):** Schema and contracts — `AgentState`, mutability registry, single-writer ownership enforcement, deterministic cycle ordering contracts.
 - **CP-1 (done):** Transaction-safe orchestrator, SHA-256 state hashing, cycle logging, append-only SQLite episodic store, replay determinism harness, interaction retrieval/salience/context pipeline.
 - **CP-2 (done):** Hybrid memory retrieval scorer with `why_selected` explainability, interaction cycle steps C/D/F (retrieve → salience → context), `FoundingTraitSeed` constitution bootstrap, evaluation harness (`evaluate_retrieval_precision`, `evaluate_self_belief_safety`).
-- **CP-3 (done):** Affect + drive dynamics + desire generation — all fast-tick and slow-tick steps are behavior-complete. All CP-3 exit gates verified (see below).
+- **CP-3 (done, deterministic core):** Affect + drive dynamics + desire generation are implemented; fast/slow deterministic pathways are covered, while LLM-dependent fast-tick appraisal remains a stub (`appraise`). All CP-3 deterministic exit gates verified (see below).
 - **CP-4 (done):** Complete nightly macro-cycle — episode selection with recency window filter (72h default), deterministic clustering, evidence scoring, `update_self_beliefs` with `max_new_statements_per_cycle` cap (3), `decay_unreinforced_beliefs` step applying −0.02/cycle after 14 days of no reinforcement (CONST_SEED beliefs exempt), goal lifecycle management (staleness abandonment after 30 days, frustration-based suspension at ≥0.75), nightly clearing of `persisted_desires` and `consecutive_thought_categories`, and macro determinism replay verification.
 - **CP-5 (done):** Governance hardening — `PolicyOutcome`/`PolicyCheckResult` for machine-auditable checks (categories: `CONST_VIOLATION`, `OWNERSHIP_VIOLATION`, `HARD_LIMIT_BREACH`, `VALUE_CONTRADICTION`, `WRITE_CAP_EXCEEDED`, `PII_DETECTED`), `policy_and_consistency_check` wired in interaction cycle, episodic store lifecycle management (`transition_lifecycle`, `cool_records`, `archive_cooled`, `forget`, `forget_bulk`), PII redaction hooks (email, phone, SSN, CC, IPv4) applied before every long-term store commit, `memory_compaction` macro step wired to run `cool_records`/`archive_cooled` each nightly cycle, `trace_viewer.py` extended with policy outcome and macro-cycle detail rendering.
-- **CP-6 (done):** Evaluation harness — `CycleSnapshot` dataclass, `compute_mcs`/`compute_iss`/`compute_eci`/`rollback_rate` metric functions, `detect_drift_alerts()` for ISS/ECI/MCS regression detection across replay runs, multi-day replay test suite (24-cycle 3-day simulation with metric threshold validation), P95 context-build latency benchmark (target < 250 ms, tested over 50 samples), `render_response` deterministic stub (no LLM required for end-to-end cycle testing), determinism bug fixed (desire/goal IDs made replay-safe by replacing `uuid4()` with tick-derived deterministic IDs).
+- **CP-6 (done for deterministic evaluation):** Evaluation harness — `CycleSnapshot` dataclass, `compute_mcs`/`compute_iss`/`compute_eci`/`rollback_rate` metric functions, `detect_drift_alerts()` for ISS/ECI/MCS regression detection across replay runs, multi-day replay test suite (24-cycle 3-day simulation with metric threshold validation), P95 context-build latency benchmark (target < 250 ms, tested over 50 samples), and determinism bug fix (desire/goal IDs made replay-safe by replacing `uuid4()` with tick-derived deterministic IDs). `render_response` remains a deterministic stub pending LLM integration.
+
+### Known Stubs
+
+- `parse_intent_affect` — `src/engine/cycles/interaction.py`
+- `appraisal_update` — `src/engine/cycles/interaction.py`
+- `render_response` (deterministic fallback stub pending adapter wiring) — `src/engine/cycles/interaction.py`
+- `appraise` (fast-tick appraisal stub) — `src/engine/cycles/fast_tick.py`
 
 **178 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay` (including `test_multi_day`), `tests/eval` (including `test_latency`, `test_metrics`), `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, `test_macro_tick`, and `test_governance`.
 
@@ -159,14 +169,14 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-5 are comp
 | **CP-0** | **Done** | Schema/state contracts, single-writer ownership, deterministic cycle ordering contracts | `src/schema/state.py`, `src/schema/mutability.py`, `src/schema/validator.py`, `src/engine/contracts.py`, `tests/test_schema.py`, `tests/test_contracts.py` |
 | **CP-1** | **Done** | Transaction-safe orchestrator, cycle logging/hash deltas, append-only episodic store, interaction retrieval/salience/context packaging, replay determinism | `src/engine/orchestrator.py`, `src/engine/cycle_log.py`, `src/store/episodic_store.py`, `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `tests/test_orchestrator.py`, `tests/replay/test_determinism.py`, `tests/test_retrieval_and_interaction.py` |
 | **CP-2** | **Done** | Hybrid retrieval scorer with explainability, interaction steps C/D/F, constitution belief bootstrap, evaluation metrics | `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `src/schema/state.py`, `src/eval/metrics.py`, `tests/eval/test_metrics.py`, `tests/test_retrieval_and_interaction.py` |
-| **CP-3** | **Done** | Affect + drive dynamics, desire generation/crystallization, fast-tick and slow-tick pipelines behavior-complete | `src/engine/modules/`, `src/engine/cycles/fast_tick.py`, `src/engine/cycles/slow_tick.py`, `src/engine/default_setup.py`, `tests/test_fast_tick.py`, `tests/test_slow_tick.py` |
+| **CP-3** | **Done (deterministic core)** | Affect + drive dynamics, desire generation/crystallization, fast/slow deterministic pathways complete; `fast_tick.appraise` remains a stub | `src/engine/modules/`, `src/engine/cycles/fast_tick.py`, `src/engine/cycles/slow_tick.py`, `src/engine/default_setup.py`, `tests/test_fast_tick.py`, `tests/test_slow_tick.py` |
 | **CP-4** | **Done** | Full macro-cycle: episode selection + recency filter, evidence scoring, belief update with new-statement cap, confidence decay for unreinforced beliefs, goal lifecycle (staleness/abandonment/suspension), nightly ephemeral clearing, determinism replay test | `src/engine/cycles/macro.py`, `src/engine/contracts.py`, `src/engine/default_setup.py`, `tests/test_macro_tick.py`, `tests/test_default_setup.py` |
 | **CP-5** | **Done** | `PolicyOutcome` governance objects, interaction `policy_and_consistency_check` wired, episodic store lifecycle transitions, user-initiated `forget`/`forget_bulk`, PII redaction before long-term commit, macro-cycle memory compaction, trace viewer | `src/engine/governance.py`, `src/engine/pii_redaction.py`, `src/engine/cycles/_store_helpers.py`, `src/engine/cycles/interaction.py`, `src/store/episodic_store.py`, `src/cli/trace_viewer.py`, `tests/test_governance.py` |
-| **CP-6** | **Done** | MCS/ISS/ECI metrics, drift alerts, P95 latency benchmark, multi-day replay with 7 tests, determinism fix, render_response stub | `src/eval/metrics.py`, `tests/replay/test_multi_day.py`, `tests/fixtures/multi_day.json`, `tests/eval/test_latency.py`, `tests/eval/test_metrics.py`, `src/engine/cycles/interaction.py` |
+| **CP-6** | **Done (deterministic eval); LLM integration pending** | MCS/ISS/ECI metrics, drift alerts, P95 latency benchmark, multi-day replay with 7 tests, determinism fix; interaction still uses `render_response` stub | `src/eval/metrics.py`, `tests/replay/test_multi_day.py`, `tests/fixtures/multi_day.json`, `tests/eval/test_latency.py`, `tests/eval/test_metrics.py`, `src/engine/cycles/interaction.py` |
 
 ## Remaining Work
 
-All planned checkpoints (CP-0 through CP-6) are complete. The engine is functionally ready for integration with an LLM adapter. Remaining integration work:
+Deterministic checkpoint work (CP-0 through CP-6) is complete, but full LLM-backed behavior is not. The engine is ready for adapter integration, with the following completion items still pending:
 
 - **LLM adapter wiring:** Replace the `render_response` deterministic stub with a real LLM call (llama.cpp/vLLM/API). The stub response is already passed through governance checks, so wiring is isolated to one step function.
 - **Vector embeddings:** Swap the placeholder similarity scores in memory records with real embeddings (all-MiniLM-L6-v2 or equivalent) for production retrieval quality.
