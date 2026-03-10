@@ -8,6 +8,7 @@ from src.engine.cycles.interaction import (
 )
 from src.engine.retrieval import load_retrieval_limits, rank_memory_candidates
 from src.engine.orchestrator import PolicyViolation
+from src.store.vector_store import VectorStore
 from src.schema.state import AgentState
 
 
@@ -145,3 +146,102 @@ def test_render_response_stub_includes_memory_count():
     render_response(state, event, [])
 
     assert "3 memories" in event["candidate_response"]
+
+
+@pytest.fixture
+def vector_indexed_memory_fixture():
+    records = [
+        {
+            "id": "m-alpha",
+            "event_text": "I enjoyed reading near the quiet lake",
+            "recency": 0.9,
+            "importance": 0.85,
+            "self_relevance": 0.7,
+            "source": "episodic",
+        },
+        {
+            "id": "m-beta",
+            "event_text": "I fixed a bug in the parser and felt proud",
+            "recency": 0.8,
+            "importance": 0.75,
+            "self_relevance": 0.8,
+            "source": "episodic",
+        },
+    ]
+
+    store = VectorStore()
+    store.upsert("m-alpha", [1.0, 0.0, 0.0], {"source": "episodic"})
+    store.upsert("m-beta", [0.8, 0.6, 0.0], {"source": "episodic"})
+
+    return {"records": records, "vector_store": store}
+
+
+def test_retrieve_memory_candidates_prefers_vector_results_then_reranks(
+    vector_indexed_memory_fixture,
+):
+    fixture = vector_indexed_memory_fixture
+    state = AgentState()
+    event = {
+        "message": "Help me recall my lakeside reading memory",
+        "memory_records": fixture["records"],
+        "_vector_store": fixture["vector_store"],
+        "vector_filters": {"source": "episodic"},
+    }
+
+    from src.engine.cycles import interaction as interaction_cycle
+
+    def _fake_embed_text(_text, *, content_type="user_turn"):
+        return {
+            "vector": [1.0, 0.0, 0.0],
+            "metadata": {"model": "test", "dimension": 3, "content_type": content_type},
+        }
+
+    original = interaction_cycle.embed_text
+    interaction_cycle.embed_text = _fake_embed_text
+    try:
+        retrieve_memory_candidates(state, event, [])
+    finally:
+        interaction_cycle.embed_text = original
+
+    ids = [item["id"] for item in event["memory_candidates"]]
+    assert ids[0] == "m-alpha"
+    assert set(ids) == {"m-alpha", "m-beta"}
+
+
+def test_retrieve_memory_candidates_keeps_why_selected_complete_with_vector_hits(
+    vector_indexed_memory_fixture,
+):
+    fixture = vector_indexed_memory_fixture
+    state = AgentState()
+    event = {
+        "message": "Recall coding memory",
+        "memory_records": fixture["records"],
+        "_vector_store": fixture["vector_store"],
+    }
+
+    from src.engine.cycles import interaction as interaction_cycle
+
+    def _fake_embed_text(_text, *, content_type="user_turn"):
+        return {
+            "vector": [0.8, 0.6, 0.0],
+            "metadata": {"model": "test", "dimension": 3, "content_type": content_type},
+        }
+
+    original = interaction_cycle.embed_text
+    interaction_cycle.embed_text = _fake_embed_text
+    try:
+        retrieve_memory_candidates(state, event, [])
+    finally:
+        interaction_cycle.embed_text = original
+
+    for candidate in event["memory_candidates"]:
+        why_selected = candidate["why_selected"]
+        assert "score_components" in why_selected
+        assert "weights" in why_selected
+        assert "hybrid_score" in why_selected
+        assert set(why_selected["score_components"].keys()) == {
+            "similarity",
+            "recency",
+            "importance",
+            "self_relevance",
+        }

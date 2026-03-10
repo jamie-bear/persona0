@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState, SelfBelief
+from ._store_helpers import attach_embedding_metadata
 from ..modules._config import load_memory_config, load_reflection_config
 
 
@@ -271,16 +272,20 @@ def archive_reflection(state: AgentState, event: Dict[str, Any], pending_writes:
     now = datetime.now(timezone.utc).isoformat()
     archived = []
     for item in accepted:
-        archived.append(
-            {
-                "id": item.get("reflection_id"),
-                "created_at": now,
-                "source_episode_ids": list(item.get("source_episode_ids", [])),
-                "pattern_statement": item.get("pattern_statement", ""),
-                "confidence_delta": item.get("confidence_delta", 0.0),
-                "evidence_score": item.get("evidence_score", 0.0),
-            }
+        reflection_record = {
+            "id": item.get("reflection_id"),
+            "created_at": now,
+            "source_episode_ids": list(item.get("source_episode_ids", [])),
+            "pattern_statement": item.get("pattern_statement", ""),
+            "confidence_delta": item.get("confidence_delta", 0.0),
+            "evidence_score": item.get("evidence_score", 0.0),
+        }
+        attach_embedding_metadata(
+            reflection_record,
+            reflection_record.get("pattern_statement", ""),
+            content_type="semantic_reflection",
         )
+        archived.append(reflection_record)
 
     event["_pending_reflections"] = archived
     pending_writes.append({"field_path": "semantic_store", "author_module": "ReflectionEngine"})

@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Optional
 
 from ..store.episodic_store import EpisodicStore
+from ..store.vector_store import VectorStore
 from .contracts import (
     ACTIVITY_TRANSITION,
     APPRAISE,
@@ -55,6 +56,7 @@ from .orchestrator import EgoOrchestrator
 def register_default_steps(
     orchestrator: EgoOrchestrator,
     store: Optional[EpisodicStore] = None,
+    vector_store: Optional[VectorStore] = None,
 ) -> EgoOrchestrator:
     """Register all behavior-complete step implementations on the orchestrator.
 
@@ -72,7 +74,13 @@ def register_default_steps(
     # ── Interaction cycle ──────────────────────────────────────────────────────
     orchestrator.register_step(INGEST_TURN, interaction.ingest_turn)
     orchestrator.register_step("parse_intent_affect", interaction.parse_intent_affect)
-    orchestrator.register_step(RETRIEVE_MEMORY_CANDIDATES, interaction.retrieve_memory_candidates)
+    if vector_store is not None:
+        def _retrieve_memory_candidates_with_vector_store(state, event, pending_writes):
+            event.setdefault("_vector_store", vector_store)
+            interaction.retrieve_memory_candidates(state, event, pending_writes)
+        orchestrator.register_step(RETRIEVE_MEMORY_CANDIDATES, _retrieve_memory_candidates_with_vector_store)
+    else:
+        orchestrator.register_step(RETRIEVE_MEMORY_CANDIDATES, interaction.retrieve_memory_candidates)
     orchestrator.register_step(SALIENCE_COMPETITION, interaction.salience_competition)
     orchestrator.register_step("appraisal_update", interaction.appraisal_update)
     orchestrator.register_step(BUILD_CONTEXT_PACKAGE, interaction.build_context_package)
@@ -94,6 +102,8 @@ def register_default_steps(
     if store is not None:
         def _write_memory_with_store(state, event, pending_writes):
             event.setdefault("_store", store)
+            if vector_store is not None:
+                event.setdefault("_vector_store", vector_store)
             fast_tick.write_memory(state, event, pending_writes)
         orchestrator.register_step(WRITE_MEMORY, _write_memory_with_store)
     else:
@@ -106,6 +116,8 @@ def register_default_steps(
     if store is not None:
         def _routine_event_with_store(state, event, pending_writes):
             event.setdefault("_store", store)
+            if vector_store is not None:
+                event.setdefault("_vector_store", vector_store)
             slow_tick.routine_event(state, event, pending_writes)
         orchestrator.register_step(ROUTINE_EVENT, _routine_event_with_store)
     else:
