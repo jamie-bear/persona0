@@ -131,3 +131,42 @@ def test_drive_review_reports_unmet_drives() -> None:
     drive_review(state, event, [])
 
     assert event["_macro_unmet_drives"] == [{"drive": "social_need", "value": 0.75}]
+
+
+def test_drive_review_clears_nightly_ephemeral_state() -> None:
+    """Verify that drive_review clears persisted_desires and consecutive_thought_categories."""
+    state = AgentState()
+    state.persisted_desires = [{"id": "d1", "source_drive": "social_need", "urgency": 0.7}]
+    state.consecutive_thought_categories = ["reflection", "reflection", "planning"]
+
+    pending: list = []
+    drive_review(state, {}, pending)
+
+    assert state.persisted_desires == []
+    assert state.consecutive_thought_categories == []
+    assert any(w["field_path"] == "persisted_desires" for w in pending)
+
+
+def test_max_new_statements_per_cycle_enforced() -> None:
+    """Verify that update_self_beliefs respects the max_new_statements_per_cycle cap."""
+    state = AgentState()
+
+    # Create 5 distinct reflections that would each create a new belief
+    reflections = []
+    for i in range(5):
+        reflections.append({
+            "reflection_id": f"r{i}",
+            "proposed_self_belief_update": f"I engage with topic-{i}.",
+            "confidence_delta": 0.10,
+            "evidence_score": 0.90,
+            "source_episode_ids": [f"e{i}a", f"e{i}b"],
+            "pattern_statement": f"pattern-{i}",
+        })
+
+    event = {"_macro_scored_reflections": reflections}
+    pending: list = []
+    update_self_beliefs(state, event, pending)
+
+    # Config says max_new_statements_per_cycle = 3; only 3 new beliefs should be created
+    new_beliefs = [b for b in state.self_model.beliefs if b.source_type == "REFLECTION"]
+    assert len(new_beliefs) == 3

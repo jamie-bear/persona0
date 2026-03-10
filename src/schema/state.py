@@ -95,13 +95,6 @@ class SelfBelief(BaseModel):
     source_type: str = "CONST_SEED"
 
 
-class GoalStatus(str):
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    COMPLETED = "completed"
-    ABANDONED = "abandoned"
-
-
 class GoalRecord(BaseModel):
     """A goal in the goal store.
 
