@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+import time
+
 import yaml
+
+from .telemetry import default_telemetry, telemetry_labels
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,7 @@ def load_retrieval_limits() -> Dict[str, float]:
 
 def rank_memory_candidates(memory_records: Iterable[Dict[str, Any]], top_k: int | None = None) -> List[Dict[str, Any]]:
     """Rank memory records by weighted hybrid score and return top-k with explainability."""
+    start = time.monotonic()
     limits = load_retrieval_limits()
     weights = load_weights()
     limit = top_k if top_k is not None else int(limits["candidate_limit"])
@@ -95,4 +100,11 @@ def rank_memory_candidates(memory_records: Iterable[Dict[str, Any]], top_k: int 
         )
 
     ranked.sort(key=lambda r: (-r["hybrid_score"], str(r.get("id", ""))))
-    return ranked[:limit]
+    selected = ranked[:limit]
+    default_telemetry.observe_ms(
+        "retrieval_latency_ms",
+        (time.monotonic() - start) * 1000.0,
+        telemetry_labels({"stage": "rank"}),
+    )
+    default_telemetry.increment("retrieval_calls_total")
+    return selected
