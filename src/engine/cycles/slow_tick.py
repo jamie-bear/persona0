@@ -11,7 +11,13 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState
-from ._store_helpers import deterministic_record_metadata, next_record_sequence_index, try_store_append
+from ._store_helpers import (
+    attach_embedding_metadata,
+    deterministic_record_metadata,
+    next_record_sequence_index,
+    try_store_append,
+    upsert_vector_index,
+)
 from ..modules.drive import DriveModule
 from ..modules.goal import GoalSystem
 
@@ -86,6 +92,13 @@ def routine_event(state: AgentState, event: Dict[str, Any], pending_writes: List
         "record_type": "routine_event",
         "activity": activity,
     }
+
+    embedded = attach_embedding_metadata(
+        record,
+        record.get("event_text", ""),
+        content_type="episodic_routine",
+    )
+    upsert_vector_index(event, record, embedded)
 
     store = event.get("_store")
     if store is not None:

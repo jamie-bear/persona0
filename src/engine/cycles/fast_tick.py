@@ -9,9 +9,13 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState
-from ..adapters import llm as llm_adapter
-from ..modules._config import load_config_section
-from ._store_helpers import deterministic_record_metadata, next_record_sequence_index, try_store_append
+from ._store_helpers import (
+    attach_embedding_metadata,
+    deterministic_record_metadata,
+    next_record_sequence_index,
+    try_store_append,
+    upsert_vector_index,
+)
 from ..modules.emotion import EmotionModule
 from ..modules.drive import DriveModule
 from ..modules.thought import ThoughtGenerator
@@ -152,6 +156,13 @@ def write_memory(state: AgentState, event: Dict[str, Any], pending_writes: List)
         "trigger": thought.get("trigger", "internal"),
         "source_desire_drive": thought.get("source_desire_drive"),
     }
+
+    embedded = attach_embedding_metadata(
+        record,
+        record.get("event_text", ""),
+        content_type="episodic_thought",
+    )
+    upsert_vector_index(event, record, embedded)
 
     store = event.get("_store")
     if store is not None:

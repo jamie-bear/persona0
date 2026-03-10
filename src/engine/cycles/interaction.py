@@ -8,8 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState
-from ..adapters import llm as llm_adapter
-from ..modules._config import load_config_section
+from ..adapters.embeddings import embed_text
 from ..retrieval import load_retrieval_limits, rank_memory_candidates
 
 
@@ -24,13 +23,37 @@ def parse_intent_affect(state: AgentState, event: Dict[str, Any], pending_writes
 def retrieve_memory_candidates(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
-    """C. retrieve_memory_candidates — query episodic and semantic stores."""
-    records = event.get("memory_records", [])
+    """C. retrieve_memory_candidates — vector search then rerank for explainability."""
     limits = load_retrieval_limits()
-    event["memory_candidates"] = rank_memory_candidates(
-        records,
-        top_k=int(limits["candidate_limit"]),
-    )
+    top_k = int(limits["candidate_limit"])
+    records = list(event.get("memory_records", []))
+    record_by_id = {str(r.get("id")): r for r in records if r.get("id")}
+
+    query_text = str(event.get("message", ""))
+    query_embedded = embed_text(query_text, content_type="user_turn")
+    event["query_embedding"] = query_embedded["metadata"]
+
+    candidates: List[Dict[str, Any]] = []
+    vector_store = event.get("_vector_store")
+    if vector_store is not None:
+        vector_hits = vector_store.query(
+            query_embedded["vector"],
+            top_k=top_k,
+            filters=event.get("vector_filters"),
+        )
+        for hit in vector_hits:
+            rid = str(hit.get("id", ""))
+            if not rid:
+                continue
+            base = dict(record_by_id.get(rid, {}))
+            base.setdefault("id", rid)
+            base["similarity"] = float(hit.get("similarity", base.get("similarity", 0.0)))
+            candidates.append(base)
+
+    if not candidates:
+        candidates = records
+
+    event["memory_candidates"] = rank_memory_candidates(candidates, top_k=top_k)
 
 
 def salience_competition(
