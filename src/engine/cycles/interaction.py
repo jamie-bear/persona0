@@ -67,31 +67,31 @@ def build_context_package(
 
 
 def render_response(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """G. render_response — build candidate text for policy checks.
+    """G. render_response — LLM renders candidate text; no writes to persistent state.
 
-    Supports two deterministic paths:
-    1) If ``event['_render_fn']`` is callable, it is invoked with
-       ``(state, context_package, event)`` and should return text.
-    2) Otherwise a deterministic local fallback template is used.
-
-    This step intentionally performs no persistent writes.
+    In production, an LLM adapter sets event['candidate_response'] before this
+    step runs (or this step calls out to an LLM API).  When no LLM is wired
+    the step produces a deterministic stub so downstream governance checks
+    (step H) always have a candidate_response to validate.
     """
-    context = event.get("context_package", {})
-    render_fn = event.get("_render_fn")
+    if event.get("candidate_response"):
+        # LLM adapter already populated the response; nothing to do.
+        return
 
-    if callable(render_fn):
-        candidate = str(render_fn(state, context, event))
-    else:
-        user_turn = str(context.get("user_turn", "")).strip()
-        selected_ids = list(context.get("selected_memory_ids", []))
-        memory_hint = ", ".join(selected_ids[:3]) if selected_ids else "no-prior-memory"
-        candidate = (
-            f"I hear you: {user_turn}. "
-            f"I considered memories: {memory_hint}. "
-            "I will respond consistently with my persona values."
-        ).strip()
-
-    event["candidate_response"] = candidate
+    # Deterministic stub — persona name + turn context, no randomness.
+    persona_name = str(state.persona.name) if state.persona else "Assistant"
+    ctx = event.get("context_package", {})
+    memory_count = len(ctx.get("selected_memories", []))
+    user_turn = str(event.get("message", ""))[:80]
+    dominant_goal = next(
+        (g.label for g in state.goals if getattr(g, "status", None) == "active"),
+        None,
+    )
+    goal_note = f" (pursuing: {dominant_goal})" if dominant_goal else ""
+    event["candidate_response"] = (
+        f"[{persona_name}{goal_note}] Responding to: {user_turn!r} "
+        f"with {memory_count} memories in context."
+    )
 
 
 def policy_and_consistency_check(

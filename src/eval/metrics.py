@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Mapping, Sequence
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -289,3 +289,72 @@ def rollback_rate(snapshots: Sequence[CycleSnapshot]) -> Dict[str, float]:
         "total_cycles": len(snapshots),
         "rollbacks": rollbacks,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CP-6: Longitudinal drift alerts
+# Reference: architecture.md §6 — drift detection thresholds
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class DriftAlert:
+    """Records a detected drift between two replay runs for one metric."""
+
+    metric: str
+    """'iss' | 'eci' | 'mcs'"""
+
+    run_a_value: float
+    run_b_value: float
+    delta: float
+    threshold: float
+    message: str
+
+
+def detect_drift_alerts(
+    run_a: Sequence[CycleSnapshot],
+    run_b: Sequence[CycleSnapshot],
+    iss_threshold: float = 0.10,
+    eci_threshold: float = 0.15,
+    mcs_threshold: float = 0.10,
+) -> List[DriftAlert]:
+    """Compare two replay runs and return alerts for metrics that drifted beyond thresholds.
+
+    Typical use: run the same fixture twice (e.g. on different days or after code
+    changes) and flag regressions before they reach production.
+
+    Args:
+        run_a: First run's cycle snapshots.
+        run_b: Second run's cycle snapshots.
+        iss_threshold: Max allowed |ISS_a - ISS_b|. Default 0.10.
+        eci_threshold: Max allowed |ECI_a - ECI_b|. Default 0.15.
+        mcs_threshold: Max allowed |MCS_a - MCS_b|. Default 0.10.
+
+    Returns:
+        List of DriftAlert, one per metric that exceeded its threshold.
+        Empty list means no drift detected.
+    """
+    alerts: List[DriftAlert] = []
+
+    checks = [
+        ("iss", compute_iss(run_a)["iss"], compute_iss(run_b)["iss"], iss_threshold),
+        ("eci", compute_eci(run_a)["eci"], compute_eci(run_b)["eci"], eci_threshold),
+        ("mcs", compute_mcs(run_a)["mcs"], compute_mcs(run_b)["mcs"], mcs_threshold),
+    ]
+
+    for metric, val_a, val_b, threshold in checks:
+        delta = abs(val_a - val_b)
+        if delta > threshold:
+            alerts.append(DriftAlert(
+                metric=metric,
+                run_a_value=round(val_a, 4),
+                run_b_value=round(val_b, 4),
+                delta=round(delta, 4),
+                threshold=threshold,
+                message=(
+                    f"{metric.upper()} drifted by {delta:.4f} "
+                    f"(threshold={threshold}): {val_a:.4f} → {val_b:.4f}"
+                ),
+            ))
+
+    return alerts

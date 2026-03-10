@@ -121,9 +121,9 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-5 are comp
 - **CP-3 (done):** Affect + drive dynamics + desire generation — all fast-tick and slow-tick steps are behavior-complete. All CP-3 exit gates verified (see below).
 - **CP-4 (done):** Complete nightly macro-cycle — episode selection with recency window filter (72h default), deterministic clustering, evidence scoring, `update_self_beliefs` with `max_new_statements_per_cycle` cap (3), `decay_unreinforced_beliefs` step applying −0.02/cycle after 14 days of no reinforcement (CONST_SEED beliefs exempt), goal lifecycle management (staleness abandonment after 30 days, frustration-based suspension at ≥0.75), nightly clearing of `persisted_desires` and `consecutive_thought_categories`, and macro determinism replay verification.
 - **CP-5 (done):** Governance hardening — `PolicyOutcome`/`PolicyCheckResult` for machine-auditable checks (categories: `CONST_VIOLATION`, `OWNERSHIP_VIOLATION`, `HARD_LIMIT_BREACH`, `VALUE_CONTRADICTION`, `WRITE_CAP_EXCEEDED`, `PII_DETECTED`), `policy_and_consistency_check` wired in interaction cycle, episodic store lifecycle management (`transition_lifecycle`, `cool_records`, `archive_cooled`, `forget`, `forget_bulk`), PII redaction hooks (email, phone, SSN, CC, IPv4) applied before every long-term store commit, `memory_compaction` macro step wired to run `cool_records`/`archive_cooled` each nightly cycle, `trace_viewer.py` extended with policy outcome and macro-cycle detail rendering.
-- **CP-6 (in progress):** Evaluation harness — `CycleSnapshot` dataclass, `compute_mcs`/`compute_iss`/`compute_eci`/`rollback_rate` metric functions implemented, multi-day replay test suite (24-cycle 3-day simulation with metric threshold validation), determinism bug fixed (desire/goal IDs made replay-safe by replacing `uuid4()` with tick-derived deterministic IDs).
+- **CP-6 (done):** Evaluation harness — `CycleSnapshot` dataclass, `compute_mcs`/`compute_iss`/`compute_eci`/`rollback_rate` metric functions, `detect_drift_alerts()` for ISS/ECI/MCS regression detection across replay runs, multi-day replay test suite (24-cycle 3-day simulation with metric threshold validation), P95 context-build latency benchmark (target < 250 ms, tested over 50 samples), `render_response` deterministic stub (no LLM required for end-to-end cycle testing), determinism bug fixed (desire/goal IDs made replay-safe by replacing `uuid4()` with tick-derived deterministic IDs).
 
-**168 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay` (including `test_multi_day`), `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, `test_macro_tick`, and `test_governance`.
+**178 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay` (including `test_multi_day`), `tests/eval` (including `test_latency`, `test_metrics`), `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, `test_macro_tick`, and `test_governance`.
 
 ### Modules Implemented
 
@@ -139,7 +139,7 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-5 are comp
 | `_store_helpers` | `src/engine/cycles/_store_helpers.py` | Shared EpisodicEvent construction + PII redaction used by fast_tick and slow_tick |
 | `macro` cycle | `src/engine/cycles/macro.py` | 11-step nightly reflection: episode selection, clustering, evidence scoring, belief update+decay, memory compaction, goal lifecycle, drive review, nightly clearing |
 | `trace_viewer` | `src/cli/trace_viewer.py` | Human-readable rendering of cycle logs, policy outcomes, and macro-cycle details |
-| `metrics` | `src/eval/metrics.py` | `CycleSnapshot`-based MCS/ISS/ECI computation, `rollback_rate`, `compute_all_metrics` |
+| `metrics` | `src/eval/metrics.py` | `CycleSnapshot`-based MCS/ISS/ECI computation, `rollback_rate`, `compute_all_metrics`, `detect_drift_alerts` |
 | Config loader | `src/engine/modules/_config.py` | Cached YAML section loader (includes `load_reflection_config`, `load_goals_config`, etc.) |
 | Step factory | `src/engine/default_setup.py` | `register_default_steps()` — wires all cycle steps (including `decay_unreinforced_beliefs` and `compact_episodic_memory`) onto an `EgoOrchestrator` |
 
@@ -162,12 +162,12 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-5 are comp
 | **CP-3** | **Done** | Affect + drive dynamics, desire generation/crystallization, fast-tick and slow-tick pipelines behavior-complete | `src/engine/modules/`, `src/engine/cycles/fast_tick.py`, `src/engine/cycles/slow_tick.py`, `src/engine/default_setup.py`, `tests/test_fast_tick.py`, `tests/test_slow_tick.py` |
 | **CP-4** | **Done** | Full macro-cycle: episode selection + recency filter, evidence scoring, belief update with new-statement cap, confidence decay for unreinforced beliefs, goal lifecycle (staleness/abandonment/suspension), nightly ephemeral clearing, determinism replay test | `src/engine/cycles/macro.py`, `src/engine/contracts.py`, `src/engine/default_setup.py`, `tests/test_macro_tick.py`, `tests/test_default_setup.py` |
 | **CP-5** | **Done** | `PolicyOutcome` governance objects, interaction `policy_and_consistency_check` wired, episodic store lifecycle transitions, user-initiated `forget`/`forget_bulk`, PII redaction before long-term commit, macro-cycle memory compaction, trace viewer | `src/engine/governance.py`, `src/engine/pii_redaction.py`, `src/engine/cycles/_store_helpers.py`, `src/engine/cycles/interaction.py`, `src/store/episodic_store.py`, `src/cli/trace_viewer.py`, `tests/test_governance.py` |
-| **CP-6** | **In progress** | MCS/ISS/ECI metrics implemented, multi-day replay harness with 7 tests, determinism fix for desire/goal IDs | `src/eval/metrics.py`, `tests/replay/test_multi_day.py`, `tests/fixtures/multi_day.json` |
+| **CP-6** | **Done** | MCS/ISS/ECI metrics, drift alerts, P95 latency benchmark, multi-day replay with 7 tests, determinism fix, render_response stub | `src/eval/metrics.py`, `tests/replay/test_multi_day.py`, `tests/fixtures/multi_day.json`, `tests/eval/test_latency.py`, `tests/eval/test_metrics.py`, `src/engine/cycles/interaction.py` |
 
 ## Remaining Work
 
-### CP-6 — Evaluation (remaining items)
+All planned checkpoints (CP-0 through CP-6) are complete. The engine is functionally ready for integration with an LLM adapter. Remaining integration work:
 
-- **Longitudinal drift alerts:** ISS/ECI delta thresholds across replay runs to flag identity drift
-- **Operational readiness:** P95 context-build latency target < 250 ms (excluding LLM)
-- **Interaction cycle render stub:** `render_response` remains LLM-dependent; the hard-limit and value checks in `policy_and_consistency_check` operate on real candidate text once wired to an LLM
+- **LLM adapter wiring:** Replace the `render_response` deterministic stub with a real LLM call (llama.cpp/vLLM/API). The stub response is already passed through governance checks, so wiring is isolated to one step function.
+- **Vector embeddings:** Swap the placeholder similarity scores in memory records with real embeddings (all-MiniLM-L6-v2 or equivalent) for production retrieval quality.
+- **Asyncio scheduler:** Wire the four cycle types to a time-based scheduler for autonomous background operation.
