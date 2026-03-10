@@ -1,5 +1,6 @@
 from src.engine.cycles.interaction import (
     build_context_package,
+    render_response,
     retrieve_memory_candidates,
     salience_competition,
 )
@@ -74,3 +75,70 @@ def test_salience_buffer_capacity_and_context_package_writes():
         "SalienceGate",
         "ContextBuilder",
     }
+
+
+def test_render_response_stub_produces_candidate_when_no_llm():
+    """render_response must set event['candidate_response'] when no LLM is wired."""
+    state = AgentState()
+    event = {
+        "message": "What is your name?",
+        "context_package": {
+            "user_turn": "What is your name?",
+            "selected_memories": [{"id": "m-1"}, {"id": "m-2"}],
+            "selected_memory_ids": ["m-1", "m-2"],
+        },
+    }
+    pending: list = []
+
+    render_response(state, event, pending)
+
+    assert "candidate_response" in event
+    response = event["candidate_response"]
+    assert isinstance(response, str)
+    assert len(response) > 0
+
+
+def test_render_response_stub_does_not_overwrite_existing_response():
+    """render_response must not overwrite a response already set by an LLM adapter."""
+    state = AgentState()
+    existing = "Hello! I'm your assistant."
+    event = {"message": "Hi", "candidate_response": existing}
+    pending: list = []
+
+    render_response(state, event, pending)
+
+    assert event["candidate_response"] == existing
+
+
+def test_render_response_stub_is_deterministic():
+    """Same state + event must produce the same stub response."""
+    state = AgentState()
+    event_a = {
+        "message": "Tell me about yourself.",
+        "context_package": {"user_turn": "Tell me about yourself.", "selected_memories": []},
+    }
+    event_b = {
+        "message": "Tell me about yourself.",
+        "context_package": {"user_turn": "Tell me about yourself.", "selected_memories": []},
+    }
+
+    render_response(state, event_a, [])
+    render_response(state, event_b, [])
+
+    assert event_a["candidate_response"] == event_b["candidate_response"]
+
+
+def test_render_response_stub_includes_memory_count():
+    """Stub response must reflect how many memories are in context."""
+    state = AgentState()
+    event = {
+        "message": "Hello",
+        "context_package": {
+            "user_turn": "Hello",
+            "selected_memories": [{"id": f"m-{i}"} for i in range(3)],
+        },
+    }
+
+    render_response(state, event, [])
+
+    assert "3 memories" in event["candidate_response"]
