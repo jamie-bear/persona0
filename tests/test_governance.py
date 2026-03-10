@@ -1,8 +1,8 @@
 """Tests for CP-5 governance features: PolicyOutcome, store lifecycle, PII redaction."""
+
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from src.engine.governance import (
     PolicyCategory,
@@ -17,7 +17,7 @@ from src.engine.pii_redaction import redact_pii, redact_record
 from src.schema.mutability import DEFAULT_REGISTRY
 from src.schema.state import AgentState
 from src.store.episodic_store import EpisodicStore
-from src.schema.records import EpisodicEvent, RecordMeta, AffectSnapshot, DriveSnapshot
+from src.schema.records import EpisodicEvent, RecordMeta
 
 
 # ── PolicyOutcome tests ──────────────────────────────────────────────────────
@@ -114,6 +114,7 @@ def test_check_value_consistency_warns_on_contradiction() -> None:
 def _make_store(tmp_path: Path = None) -> EpisodicStore:
     if tmp_path is None:
         import tempfile
+
         tmp_path = Path(tempfile.mkdtemp())
     return EpisodicStore(tmp_path / "test.db")
 

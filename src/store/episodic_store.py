@@ -6,6 +6,7 @@ CP-1: records are never modified or deleted (except decay_factor)
 CP-5: lifecycle transitions (active → cooling → archived → deleted) and
       user-initiated forget/delete operations added.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..schema.records import EpisodicEvent, RecordMeta
+from ..schema.records import EpisodicEvent
 
 
 _CREATE_TABLE = """
@@ -93,9 +94,7 @@ class EpisodicStore:
             )
             self._conn.commit()
         except sqlite3.IntegrityError as exc:
-            raise ValueError(
-                f"EpisodicStore: record '{event.meta.id}' already exists"
-            ) from exc
+            raise ValueError(f"EpisodicStore: record '{event.meta.id}' already exists") from exc
         return event.meta.id
 
     def update_decay_factor(self, record_id: str, new_decay_factor: float) -> None:
@@ -108,9 +107,7 @@ class EpisodicStore:
 
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
-    def transition_lifecycle(
-        self, record_id: str, new_state: str
-    ) -> bool:
+    def transition_lifecycle(self, record_id: str, new_state: str) -> bool:
         """Transition a record's lifecycle state.
 
         Valid transitions: active→cooling, cooling→archived, any→deleted.

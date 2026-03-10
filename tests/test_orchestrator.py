@@ -8,8 +8,8 @@ Tests:
 4. Rollback leaves state identical to before-snapshot
 5. Cycle log is emitted for both success and rollback cases
 """
+
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -32,6 +32,7 @@ def _make_orchestrator(tmp_path: Path) -> tuple[EgoOrchestrator, CycleLogger, Pa
 # ─────────────────────────────────────────────────────────────────────────────
 # Basic commit / rollback
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_successful_cycle_returns_success(tmp_path):
     """A cycle with no step functions registered succeeds (all no-ops)."""
@@ -87,8 +88,6 @@ def test_rollback_leaves_no_state_residue(tmp_path):
     )
 
 
-
-
 def test_rollback_restores_existing_state_object_in_place(tmp_path):
     """Rollback must preserve state object identity for external references."""
     orch, _, _ = _make_orchestrator(tmp_path)
@@ -109,6 +108,8 @@ def test_rollback_restores_existing_state_object_in_place(tmp_path):
     assert orch.state is external_state_ref
     assert orch.state.model_dump() == baseline
     assert external_state_ref.model_dump() == baseline
+
+
 def test_const_write_triggers_rollback(tmp_path):
     """Attempted write to CONST field via validate_const_fields_unchanged must rollback."""
     orch, _, _ = _make_orchestrator(tmp_path)
@@ -137,6 +138,7 @@ def test_multiple_successful_cycles(tmp_path):
 # ─────────────────────────────────────────────────────────────────────────────
 # Cycle log
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_cycle_log_emitted_on_success(tmp_path):
     """A successful cycle must write one entry to the cycle log."""
@@ -200,6 +202,7 @@ def test_rollback_entry_before_equals_after_hash(tmp_path):
 # ─────────────────────────────────────────────────────────────────────────────
 # All cycle types execute without error
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.parametrize("cycle_type", list(CycleType))
 def test_all_cycle_types_run(tmp_path, cycle_type):

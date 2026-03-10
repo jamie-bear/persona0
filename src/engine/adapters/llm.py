@@ -1,4 +1,5 @@
 """LLM adapter interface for response generation and event appraisal."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -28,7 +29,9 @@ def generate_response(context_package: Dict[str, Any], state: AgentState) -> str
     return raw.strip()
 
 
-def appraise_events(activity_events: List[Dict[str, Any]], state: AgentState) -> List[Dict[str, Any]]:
+def appraise_events(
+    activity_events: List[Dict[str, Any]], state: AgentState
+) -> List[Dict[str, Any]]:
     """Generate structured appraisal signals for fast-tick emotional updates."""
     cfg = _adapter_config()
     payload = {

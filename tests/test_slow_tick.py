@@ -8,9 +8,9 @@ Tests are organized around:
 
 Reference: Phase 3 plan — Part D (tests/test_slow_tick.py), CP-3 exit gates
 """
+
 from __future__ import annotations
 
-import pytest
 from src.schema.state import AgentState, AffectState, DriveState, GoalRecord
 from src.engine.modules.drive import DriveModule
 from src.engine.cycles.slow_tick import (
@@ -22,6 +22,7 @@ from src.engine.cycles.slow_tick import (
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _state(**kwargs) -> AgentState:
     state = AgentState()
@@ -49,14 +50,14 @@ def _desire(drive="social_need", urgency=0.80, age=0, expires=3) -> dict:
 
 # ── Desire generation ─────────────────────────────────────────────────────────
 
+
 class TestDesireGeneration:
     module = DriveModule()
 
     def test_desires_generated_above_threshold(self):
         """Drive value ≥ impulse_threshold produces a desire."""
         # social_need threshold = 0.65
-        drives = DriveState(social_need=0.80, mastery_need=0.10,
-                             rest_need=0.10, curiosity=0.10)
+        drives = DriveState(social_need=0.80, mastery_need=0.10, rest_need=0.10, curiosity=0.10)
         state = _state(drives=drives)
         event = _event()
         pending = []
@@ -67,29 +68,25 @@ class TestDesireGeneration:
 
     def test_desires_not_generated_below_threshold(self):
         """Drive value below impulse_threshold produces no desire for that drive."""
-        drives = DriveState(social_need=0.40, mastery_need=0.10,
-                             rest_need=0.10, curiosity=0.10)
+        drives = DriveState(social_need=0.40, mastery_need=0.10, rest_need=0.10, curiosity=0.10)
         state = _state(drives=drives)
         event = _event()
-        desire_generation(state, event, pending := [])
+        desire_generation(state, event, [])
         drive_names = [d["source_drive"] for d in state.active_desires]
         assert "social_need" not in drive_names
 
     def test_desire_urgency_equals_drive_value(self):
         """Generated desire urgency matches the drive value at generation."""
-        drives = DriveState(social_need=0.77, mastery_need=0.10,
-                             rest_need=0.10, curiosity=0.10)
+        drives = DriveState(social_need=0.77, mastery_need=0.10, rest_need=0.10, curiosity=0.10)
         state = _state(drives=drives)
         desire_generation(state, _event(), [])
-        social_desires = [d for d in state.active_desires
-                          if d["source_drive"] == "social_need"]
+        social_desires = [d for d in state.active_desires if d["source_drive"] == "social_need"]
         assert len(social_desires) == 1
         assert social_desires[0]["urgency"] == round(0.77, 4)
 
     def test_desire_approach_for_high_drive(self):
         """Generated desires always start as approach=True."""
-        drives = DriveState(social_need=0.80, mastery_need=0.10,
-                             rest_need=0.10, curiosity=0.10)
+        drives = DriveState(social_need=0.80, mastery_need=0.10, rest_need=0.10, curiosity=0.10)
         state = _state(drives=drives)
         desire_generation(state, _event(), [])
         for d in state.active_desires:
@@ -102,7 +99,6 @@ class TestDesireGeneration:
         state = _state(persisted_desires=[old_desire])
         desire_generation(state, _event(), [])
         # The aged desire should be expired and not in persisted_desires
-        remaining_drives = [d["source_drive"] for d in state.persisted_desires]
         # If social_need is below threshold, no new desire generated to replace it
         # The old one (aged to 3) should be gone
         old_persisted = [d for d in state.persisted_desires if d.get("age_in_ticks", 0) >= 3]
@@ -110,8 +106,7 @@ class TestDesireGeneration:
 
     def test_persisted_desires_carry_between_ticks(self):
         """High-urgency new desire persists to state.persisted_desires."""
-        drives = DriveState(social_need=0.80, mastery_need=0.10,
-                             rest_need=0.10, curiosity=0.10)
+        drives = DriveState(social_need=0.80, mastery_need=0.10, rest_need=0.10, curiosity=0.10)
         state = _state(drives=drives)
         desire_generation(state, _event(), [])
         # social_need=0.80 >= persistence_threshold=0.50 → should persist
@@ -120,6 +115,7 @@ class TestDesireGeneration:
 
 
 # ── Crystallization ───────────────────────────────────────────────────────────
+
 
 class TestCrystallization:
     module = DriveModule()
@@ -153,15 +149,16 @@ class TestCrystallization:
         ]
         desires[1]["id"] = "d2"
         proposals = self.module.check_crystallization(desires, [])
-        social_proposals = [p for p in proposals
-                            if p["crystallized_from_drive"] == "social_need"]
+        social_proposals = [p for p in proposals if p["crystallized_from_drive"] == "social_need"]
         assert len(social_proposals) == 1
 
     def test_crystallization_skipped_with_existing_active_goal(self):
         """No proposal if an active goal already satisfies the same drive."""
         aged_desire = _desire(drive="social_need", urgency=0.80, age=6, expires=10)
         existing_goal = GoalRecord(
-            id="g1", label="existing", status="active",
+            id="g1",
+            label="existing",
+            status="active",
             crystallized_from_drive="social_need",
         )
         proposals = self.module.check_crystallization([aged_desire], [existing_goal])
@@ -171,7 +168,9 @@ class TestCrystallization:
         """A suspended goal does not block crystallization for the same drive."""
         aged_desire = _desire(drive="social_need", urgency=0.80, age=6, expires=10)
         suspended_goal = GoalRecord(
-            id="g1", label="suspended", status="suspended",
+            id="g1",
+            label="suspended",
+            status="suspended",
             crystallized_from_drive="social_need",
         )
         proposals = self.module.check_crystallization([aged_desire], [suspended_goal])
@@ -192,6 +191,7 @@ class TestCrystallization:
 
 
 # ── Activity transition ───────────────────────────────────────────────────────
+
 
 class TestActivityTransition:
     def test_low_energy_gives_rest(self):
@@ -236,6 +236,7 @@ class TestActivityTransition:
 
 # ── Routine event ─────────────────────────────────────────────────────────────
 
+
 class TestRoutineEvent:
     def test_routine_event_added_to_pending_episodic(self):
         """routine_event appends one record to event['_pending_episodic']."""
@@ -263,7 +264,9 @@ class TestRoutineEvent:
         event = _event()
         routine_event(state, event, [])
         record = event["_pending_episodic"][0]
-        assert "curiosity" in record["event_text"].lower() or "reading" in record["event_text"].lower()
+        assert (
+            "curiosity" in record["event_text"].lower() or "reading" in record["event_text"].lower()
+        )
 
     def test_routine_event_writes_episodic_log(self):
         """routine_event appends 'episodic_log' to pending_writes."""
@@ -277,11 +280,11 @@ class TestRoutineEvent:
 
 # ── Desire objects NOT in episodic store (CP-3 exit gate) ────────────────────
 
+
 class TestDesireNotInEpisodicStore:
     def test_desire_objects_not_in_pending_episodic(self):
         """After desire_generation, _pending_episodic contains no desire-typed records."""
-        drives = DriveState(social_need=0.80, mastery_need=0.10,
-                             rest_need=0.10, curiosity=0.10)
+        drives = DriveState(social_need=0.80, mastery_need=0.10, rest_need=0.10, curiosity=0.10)
         state = _state(drives=drives)
         event = _event()
         desire_generation(state, event, [])
@@ -293,6 +296,7 @@ class TestDesireNotInEpisodicStore:
 
 # ── CP-3 Exit Gate: 72-hour drive bounds ─────────────────────────────────────
 
+
 class TestCP3ExitGates:
     def test_72h_drive_bounds(self):
         """After 144 fast ticks (~72 hours), all drives stay in [0.0, 1.0].
@@ -301,8 +305,7 @@ class TestCP3ExitGates:
         No satisfaction events applied (worst case: maximum growth).
         """
         module = DriveModule()
-        drives = DriveState(social_need=0.20, mastery_need=0.15,
-                             rest_need=0.10, curiosity=0.30)
+        drives = DriveState(social_need=0.20, mastery_need=0.15, rest_need=0.10, curiosity=0.30)
         for _ in range(144):  # 144 ticks × 30 min = 72 hours
             drives = module.update(drives, activity_events=[])
             assert 0.0 <= drives.social_need <= 1.0, "social_need out of bounds"
@@ -312,11 +315,9 @@ class TestCP3ExitGates:
 
     def test_drives_satisfied_by_activity_in_pipeline(self):
         """Full slow tick with conversation event reduces social_need."""
-        drives = DriveState(social_need=0.80, mastery_need=0.15,
-                             rest_need=0.10, curiosity=0.30)
-        state = _state(drives=drives)
-        event = _event(activity_events=[{"type": "conversation"}])
+        drives = DriveState(social_need=0.80, mastery_need=0.15, rest_need=0.10, curiosity=0.30)
         from src.engine.modules.drive import DriveModule as DM
+
         module = DM()
         # Apply one update with conversation event
         new_drives = module.update(drives, [{"type": "conversation"}])
@@ -325,8 +326,7 @@ class TestCP3ExitGates:
     def test_all_drives_bounded_with_satisfaction(self):
         """All drives stay in [0.0, 1.0] even with constant satisfaction events."""
         module = DriveModule()
-        drives = DriveState(social_need=0.20, mastery_need=0.15,
-                             rest_need=0.10, curiosity=0.30)
+        drives = DriveState(social_need=0.20, mastery_need=0.15, rest_need=0.10, curiosity=0.30)
         events = [
             {"type": "conversation"},
             {"type": "task_completion"},

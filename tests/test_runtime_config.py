@@ -21,7 +21,9 @@ def test_loads_environment_overlay(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_validation_fails_for_unknown_field(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     bad_defaults = tmp_path / "defaults.yaml"
-    bad_defaults.write_text("tick:\n  fast_interval_seconds: 1\n  slow_interval_seconds: 1\n  macro_interval_seconds: 1\nunknown_section: {}\n")
+    bad_defaults.write_text(
+        "tick:\n  fast_interval_seconds: 1\n  slow_interval_seconds: 1\n  macro_interval_seconds: 1\nunknown_section: {}\n"
+    )
     env_dir = tmp_path / "environments"
     env_dir.mkdir()
 

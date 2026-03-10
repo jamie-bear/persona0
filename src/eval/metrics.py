@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ def precision_at_k(retrieved_ids: Sequence[str], relevant_ids: Sequence[str], k:
 
 
 def evaluate_retrieval_precision(
-    scenarios: Iterable[Mapping[str, object]],
+    scenarios: Iterable[Mapping[str, Any]],
     thresholds: EvaluationThresholds | None = None,
 ) -> dict[str, float | bool | int]:
     """Evaluate CP-2 retrieval metrics across sampled turns.
@@ -85,7 +85,7 @@ def evaluate_retrieval_precision(
 
 
 def evaluate_self_belief_safety(
-    updates: Iterable[Mapping[str, object]],
+    updates: Iterable[Mapping[str, Any]],
     thresholds: EvaluationThresholds | None = None,
 ) -> dict[str, float | bool | int]:
     """Evaluate CP-4 self-belief safety constraints.
@@ -140,7 +140,7 @@ class CycleSnapshot:
     """
 
     tick: int
-    beliefs: List[Dict[str, float]] = field(default_factory=list)
+    beliefs: List[Dict[str, Any]] = field(default_factory=list)
     """[{'statement': str, 'confidence': float}, ...]"""
 
     affect: Dict[str, float] = field(default_factory=dict)
@@ -250,10 +250,7 @@ def compute_eci(snapshots: Sequence[CycleSnapshot]) -> Dict[str, float]:
     for i in range(len(snapshots) - 1):
         a = snapshots[i].affect
         b = snapshots[i + 1].affect
-        dist_sq = sum(
-            (float(a.get(k, 0.0)) - float(b.get(k, 0.0))) ** 2
-            for k in affect_keys
-        )
+        dist_sq = sum((float(a.get(k, 0.0)) - float(b.get(k, 0.0))) ** 2 for k in affect_keys)
         distances.append(math.sqrt(dist_sq))
 
     mean_dist = sum(distances) / len(distances)
@@ -345,16 +342,18 @@ def detect_drift_alerts(
     for metric, val_a, val_b, threshold in checks:
         delta = abs(val_a - val_b)
         if delta > threshold:
-            alerts.append(DriftAlert(
-                metric=metric,
-                run_a_value=round(val_a, 4),
-                run_b_value=round(val_b, 4),
-                delta=round(delta, 4),
-                threshold=threshold,
-                message=(
-                    f"{metric.upper()} drifted by {delta:.4f} "
-                    f"(threshold={threshold}): {val_a:.4f} → {val_b:.4f}"
-                ),
-            ))
+            alerts.append(
+                DriftAlert(
+                    metric=metric,
+                    run_a_value=round(val_a, 4),
+                    run_b_value=round(val_b, 4),
+                    delta=round(delta, 4),
+                    threshold=threshold,
+                    message=(
+                        f"{metric.upper()} drifted by {delta:.4f} "
+                        f"(threshold={threshold}): {val_a:.4f} → {val_b:.4f}"
+                    ),
+                )
+            )
 
     return alerts

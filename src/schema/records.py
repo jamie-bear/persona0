@@ -3,6 +3,7 @@ Record type schemas — all persistent and ephemeral data records.
 
 Reference: ego_data.md §2 (record schemas + mutability annotations)
 """
+
 from __future__ import annotations
 
 from typing import Annotated, List, Optional

@@ -6,6 +6,7 @@ Tests:
 2. Episodic store rollback leaves no residue
 3. Synthetic day fixture runs end-to-end
 """
+
 import json
 from pathlib import Path
 import tempfile
@@ -20,6 +21,7 @@ from src.store.episodic_store import EpisodicStore
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
+
 
 def _run_sequence_with_records(seed_state: dict, cycles: list) -> tuple[List[str], List[dict]]:
     """Run cycles with a real episodic store and return hashes + record metadata."""
@@ -41,6 +43,7 @@ def _run_sequence_with_records(seed_state: dict, cycles: list) -> tuple[List[str
             for row in rows
         ]
     return hashes, records
+
 
 def _run_sequence(seed_state: dict, cycles: list) -> List[str]:
     """Run a sequence of cycles and return the list of state hashes after each cycle."""
@@ -67,15 +70,10 @@ class TestDeterminism:
         run1 = _run_sequence(seed, cycles)
         run2 = _run_sequence(seed, cycles)
 
-        divergences = [
-            (i, h1, h2)
-            for i, (h1, h2) in enumerate(zip(run1, run2))
-            if h1 != h2
-        ]
+        divergences = [(i, h1, h2) for i, (h1, h2) in enumerate(zip(run1, run2)) if h1 != h2]
 
-        assert not divergences, (
-            f"Replay divergence detected at positions: "
-            + ", ".join(f"step {i}" for i, _, _ in divergences)
+        assert not divergences, "Replay divergence detected at positions: " + ", ".join(
+            f"step {i}" for i, _, _ in divergences
         )
 
     def test_divergence_rate_zero(self):
@@ -101,6 +99,7 @@ class TestDeterminism:
 
         # Modify seed B slightly
         import copy
+
         seed_b = copy.deepcopy(seed_a)
         seed_b["drives"]["social_need"] = 0.90  # very different
 
@@ -144,4 +143,3 @@ class TestDeterminism:
 
         assert records_run1 == records_run2
         assert records_run1, "Expected at least one episodic record in synthetic_day replay"
-

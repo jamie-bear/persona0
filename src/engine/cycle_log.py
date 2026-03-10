@@ -4,11 +4,11 @@ Cycle log writer — structured per-cycle observability log.
 Reference: cognitive_loop.md §6 (cycle log schema)
 CP-1 requirement: every cycle emits before_state_hash and field deltas.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional

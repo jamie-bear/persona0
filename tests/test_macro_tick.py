@@ -158,14 +158,16 @@ def test_max_new_statements_per_cycle_enforced() -> None:
     # Create 5 distinct reflections that would each create a new belief
     reflections = []
     for i in range(5):
-        reflections.append({
-            "reflection_id": f"r{i}",
-            "proposed_self_belief_update": f"I engage with topic-{i}.",
-            "confidence_delta": 0.10,
-            "evidence_score": 0.90,
-            "source_episode_ids": [f"e{i}a", f"e{i}b"],
-            "pattern_statement": f"pattern-{i}",
-        })
+        reflections.append(
+            {
+                "reflection_id": f"r{i}",
+                "proposed_self_belief_update": f"I engage with topic-{i}.",
+                "confidence_delta": 0.10,
+                "evidence_score": 0.90,
+                "source_episode_ids": [f"e{i}a", f"e{i}b"],
+                "pattern_statement": f"pattern-{i}",
+            }
+        )
 
     event = {"_macro_scored_reflections": reflections}
     pending: list = []
@@ -232,13 +234,9 @@ def test_decay_skips_recently_reinforced_beliefs() -> None:
         self_model={"beliefs": [belief.model_dump()]},
         tick_counter=100,
     )
-    event = {
-        "_macro_accepted_reflections": [
-            {"proposed_self_belief_update": "I enjoy reading."}
-        ]
-    }
+    event = {"_macro_accepted_reflections": [{"proposed_self_belief_update": "I enjoy reading."}]}
 
-    decay_unreinforced_beliefs(state, event, pending := [])
+    decay_unreinforced_beliefs(state, event, [])
 
     assert state.self_model.beliefs[0].confidence == 0.60  # unchanged
 
@@ -311,6 +309,7 @@ def test_recency_window_keeps_all_when_within_range() -> None:
 def test_goal_review_suspends_high_frustration_goals() -> None:
     """Goals at frustration >= 0.75 should be suspended."""
     from datetime import datetime, timezone
+
     goal = GoalRecord(
         id="g1",
         label="Learn Rust",
@@ -372,11 +371,15 @@ def test_macro_pipeline_determinism() -> None:
         update_self_beliefs(state, event, pending)
         decay_unreinforced_beliefs(state, event, pending)
 
-        results.append({
-            "beliefs": [(b.statement, b.confidence) for b in state.self_model.beliefs],
-            "reflections": [r["reflection_id"] for r in event.get("_macro_accepted_reflections", [])],
-            "clusters": len(event.get("_macro_clusters", [])),
-        })
+        results.append(
+            {
+                "beliefs": [(b.statement, b.confidence) for b in state.self_model.beliefs],
+                "reflections": [
+                    r["reflection_id"] for r in event.get("_macro_accepted_reflections", [])
+                ],
+                "clusters": len(event.get("_macro_clusters", [])),
+            }
+        )
 
     assert results[0] == results[1]
 

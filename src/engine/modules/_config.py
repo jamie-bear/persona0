@@ -6,6 +6,7 @@ Precedence (highest -> lowest):
 3. Deployment profile file (config/profiles/{profile}.yaml, profile from PERSONA0_CONFIG_PROFILE)
 4. Immutable defaults (config/defaults.immutable.yaml)
 """
+
 from __future__ import annotations
 
 import os
@@ -24,6 +25,7 @@ _PROFILES_DIR = _CONFIG_DIR / "profiles"
 _CONFIG_ROOT = Path(__file__).resolve().parents[3] / "config"
 _DEFAULT_CONFIG_PATH = _CONFIG_ROOT / "defaults.yaml"
 _ENV_CONFIG_ROOT = _CONFIG_ROOT / "environments"
+
 
 def _deep_merge(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
     merged = dict(left)
@@ -121,7 +123,9 @@ class RuntimeConfig(BaseModel):
 
 
 class RuntimeEnvOverrides(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PERSONA0_", env_nested_delimiter="__", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="PERSONA0_", env_nested_delimiter="__", extra="ignore"
+    )
 
     tick: Dict[str, Any] | None = None
     retrieval: Dict[str, Any] | None = None

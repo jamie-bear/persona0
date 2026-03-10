@@ -3,8 +3,10 @@
 Extracted from fast_tick._try_store_append and slow_tick._try_store_append_raw
 to eliminate duplication.
 """
+
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from uuid import NAMESPACE_URL, uuid5
@@ -12,6 +14,8 @@ from uuid import NAMESPACE_URL, uuid5
 from ...schema.state import AgentState
 from ..adapters.embeddings import embed_text
 from ..pii_redaction import redact_pii
+
+logger = logging.getLogger(__name__)
 
 
 _CYCLE_ORDER = {
@@ -120,17 +124,21 @@ def try_store_append(store: Any, record: Dict, state: AgentState, event: Dict) -
         )
         store.append(ep, cycle_id=event.get("_cycle_id", ""), author_module="Orchestrator")
     except Exception:
-        pass
+        logger.warning("Failed to append episodic record to store", exc_info=True)
 
 
-def attach_embedding_metadata(record: Dict[str, Any], text: str, *, content_type: str) -> Dict[str, Any]:
+def attach_embedding_metadata(
+    record: Dict[str, Any], text: str, *, content_type: str
+) -> Dict[str, Any]:
     """Attach embedding vector + metadata to a record payload."""
     embedded = embed_text(text, content_type=content_type)
     record["embedding"] = embedded["metadata"]
     return embedded
 
 
-def upsert_vector_index(event: Dict[str, Any], record: Dict[str, Any], embedded: Dict[str, Any]) -> None:
+def upsert_vector_index(
+    event: Dict[str, Any], record: Dict[str, Any], embedded: Dict[str, Any]
+) -> None:
     """Best-effort vector index upsert when a vector store is injected."""
     vector_store = event.get("_vector_store")
     if vector_store is None:
@@ -138,4 +146,4 @@ def upsert_vector_index(event: Dict[str, Any], record: Dict[str, Any], embedded:
     try:
         vector_store.upsert(record["id"], embedded["vector"], record)
     except Exception:
-        pass
+        logger.warning("Failed to upsert record into vector index", exc_info=True)

@@ -2,13 +2,11 @@ import pytest
 
 from src.engine.cycles.interaction import (
     build_context_package,
-    policy_and_consistency_check,
     render_response,
     retrieve_memory_candidates,
     salience_competition,
 )
 from src.engine.retrieval import load_retrieval_limits, rank_memory_candidates
-from src.engine.orchestrator import PolicyViolation
 from src.store.vector_store import VectorStore
 from src.schema.state import AgentState
 

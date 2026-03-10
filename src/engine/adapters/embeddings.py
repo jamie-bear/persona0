@@ -1,4 +1,5 @@
 """Deterministic embeddings adapter used for memory indexing and retrieval."""
+
 from __future__ import annotations
 
 import hashlib
@@ -24,7 +25,7 @@ def generate_embedding(text: str, *, dimension: int = _DEFAULT_DIMENSION) -> Lis
         for idx in range(len(digest)):
             if len(vector) >= dimension:
                 break
-            vector.append(_float_from_digest(digest[idx: idx + 1]))
+            vector.append(_float_from_digest(digest[idx : idx + 1]))
         counter += 1
 
     norm = math.sqrt(sum(v * v for v in vector))
@@ -41,7 +42,7 @@ def build_embedding_metadata(
     content_type: str = "memory_record",
 ) -> Dict[str, Any]:
     """Return compact metadata describing the embedding provenance."""
-    checksum = hashlib.sha1((text or "").encode("utf-8")).hexdigest()
+    checksum = hashlib.sha1((text or "").encode("utf-8"), usedforsecurity=False).hexdigest()
     return {
         "model": model,
         "dimension": len(vector),

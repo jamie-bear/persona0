@@ -59,6 +59,7 @@ def test_self_belief_eval_fails_when_over_cap_delta_is_accepted():
 
 # ── Drift alert tests ─────────────────────────────────────────────────────────
 
+
 def _make_snapshots(beliefs_conf: float, affect_val: float, n: int = 5) -> list:
     return [
         CycleSnapshot(
@@ -131,7 +132,9 @@ def test_detect_drift_alerts_returns_drift_alert_dataclass():
     run_b = _make_snapshots(beliefs_conf=0.9, affect_val=0.5)
 
     # Trigger with very tight threshold
-    alerts = detect_drift_alerts(run_a, run_b, iss_threshold=0.0, eci_threshold=0.0, mcs_threshold=0.0)
+    alerts = detect_drift_alerts(
+        run_a, run_b, iss_threshold=0.0, eci_threshold=0.0, mcs_threshold=0.0
+    )
 
     for alert in alerts:
         assert isinstance(alert, DriftAlert)

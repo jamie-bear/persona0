@@ -7,6 +7,7 @@ excluding any LLM invocation.
 
 Reference: architecture.md §7 — non-functional targets
 """
+
 from __future__ import annotations
 
 import time
@@ -38,9 +39,7 @@ def _make_memory_records(n: int) -> List[Dict[str, Any]]:
     ]
 
 
-def _run_context_build_pipeline(
-    state: AgentState, records: List[Dict[str, Any]]
-) -> None:
+def _run_context_build_pipeline(state: AgentState, records: List[Dict[str, Any]]) -> None:
     """Run the three deterministic interaction steps: C → D → F."""
     event: Dict[str, Any] = {
         "message": "Hello, how are you today?",
@@ -94,7 +93,7 @@ class TestContextBuildLatency:
         assert p95_ms < self.P95_LIMIT_MS, (
             f"P95 context-build latency {p95_ms:.2f} ms exceeds {self.P95_LIMIT_MS} ms limit. "
             f"min={durations_ms[0]:.2f} ms, max={durations_ms[-1]:.2f} ms, "
-            f"mean={sum(durations_ms)/len(durations_ms):.2f} ms"
+            f"mean={sum(durations_ms) / len(durations_ms):.2f} ms"
         )
 
     def test_mean_context_build_under_50ms(

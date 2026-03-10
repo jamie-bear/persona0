@@ -171,7 +171,7 @@ class RuntimeScheduler:
                 self.health.dead_letter_size = len(self.dead_letters)
                 return
 
-            backoff = self.retry_policy.base_backoff_seconds * (2 ** attempt)
+            backoff = self.retry_policy.base_backoff_seconds * (2**attempt)
             backoff += self._jitter(0.0, backoff * self.retry_policy.jitter_ratio)
             await self._sleep(backoff)
 
@@ -213,17 +213,21 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def build_runtime_scheduler(state: Optional[AgentState] = None, store: Any = None) -> RuntimeScheduler:
+def build_runtime_scheduler(
+    state: Optional[AgentState] = None, store: Any = None
+) -> RuntimeScheduler:
     validate_startup_config()
     state = state or AgentState()
     orchestrator = register_default_steps(EgoOrchestrator(state), store=store)
-    startup_hooks: List[Hook] = [validate_runtime_config]
+    startup_hooks: List[Hook] = []
     shutdown_hooks: List[Hook] = []
     if store is not None:
         lifecycle = _StoreLifecycleHook(store)
         startup_hooks.append(lifecycle.startup)
         shutdown_hooks.append(lifecycle.shutdown)
-    return RuntimeScheduler(orchestrator, startup_hooks=startup_hooks, shutdown_hooks=shutdown_hooks)
+    return RuntimeScheduler(
+        orchestrator, startup_hooks=startup_hooks, shutdown_hooks=shutdown_hooks
+    )
 
 
 async def _run_main(duration_seconds: Optional[float] = None) -> None:

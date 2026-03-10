@@ -3,6 +3,7 @@ Interaction cycle step stubs.
 
 Reference: cognitive_loop.md §2
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -27,7 +28,9 @@ def retrieve_memory_candidates(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
     """C. retrieve_memory_candidates — vector search then rerank for explainability."""
-    with default_telemetry.time_block("interaction_step_latency_ms", telemetry_labels({"step": "retrieve_memory_candidates"})):
+    with default_telemetry.time_block(
+        "interaction_step_latency_ms", telemetry_labels({"step": "retrieve_memory_candidates"})
+    ):
         limits = load_retrieval_limits()
         top_k = int(limits["candidate_limit"])
         records = list(event.get("memory_records", []))
@@ -60,11 +63,11 @@ def retrieve_memory_candidates(
         event["memory_candidates"] = rank_memory_candidates(candidates, top_k=top_k)
 
 
-def salience_competition(
-    state: AgentState, event: Dict[str, Any], pending_writes: List
-) -> None:
+def salience_competition(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
     """D. salience_competition — select what enters working context (capacity: 5)."""
-    with default_telemetry.time_block("interaction_step_latency_ms", telemetry_labels({"step": "salience_competition"})):
+    with default_telemetry.time_block(
+        "interaction_step_latency_ms", telemetry_labels({"step": "salience_competition"})
+    ):
         limits = load_retrieval_limits()
     capacity = int(limits["salience_buffer_capacity"])
     candidates = event.get("memory_candidates", [])
@@ -80,9 +83,7 @@ def appraisal_update(state: AgentState, event: Dict[str, Any], pending_writes: L
     """E. appraisal_update — evaluate event against goals, self-model, current affect."""
 
 
-def build_context_package(
-    state: AgentState, event: Dict[str, Any], pending_writes: List
-) -> None:
+def build_context_package(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
     """F. build_context_package — assemble the prompt context sent to LLM."""
     selected_ids = state.attention.salience_buffer
     candidate_by_id = {c.get("id"): c for c in event.get("memory_candidates", [])}
@@ -195,10 +196,9 @@ def policy_and_consistency_check(
 
     if not combined.passed:
         from ..orchestrator import PolicyViolation
+
         blocked = summary.get("block_categories", [])
-        raise PolicyViolation(
-            "Policy check failed: " + ", ".join(blocked or ["unknown"])
-        )
+        raise PolicyViolation("Policy check failed: " + ", ".join(blocked or ["unknown"]))
 
 
 def commit_or_rollback(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

@@ -52,7 +52,9 @@ async def test_multi_hour_accelerated_ordering_is_deterministic() -> None:
 
     def run_cycle_spy_2(cycle_type: CycleType, input_event):
         second_run_ordering.append(cycle_type)
-        return CycleResult(success=True, cycle_id=f"r2-{len(second_run_ordering)}", cycle_type=cycle_type)
+        return CycleResult(
+            success=True, cycle_id=f"r2-{len(second_run_ordering)}", cycle_type=cycle_type
+        )
 
     orchestrator.run_cycle = run_cycle_spy_2  # type: ignore[assignment]
     clock.now = 0.0

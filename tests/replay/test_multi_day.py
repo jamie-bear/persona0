@@ -7,11 +7,11 @@ Tests:
 3. MCS/ISS/ECI metrics computed from cycle snapshots meet thresholds
 4. Rollback rate is 0% across entire simulation
 """
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List
 
 from src.engine.contracts import CycleType
 from src.engine.cycle_log import hash_state
@@ -43,21 +43,23 @@ def _run_multi_day(seed_state: dict, cycles: list) -> tuple[list[str], list[Cycl
         hashes.append(hash_state(orch.state))
 
         # Collect snapshot for metrics
-        snapshots.append(CycleSnapshot(
-            tick=orch.state.tick_counter,
-            beliefs=[
-                {"statement": b.statement, "confidence": b.confidence}
-                for b in orch.state.self_model.beliefs
-            ],
-            affect={
-                "valence": orch.state.affect.valence,
-                "arousal": orch.state.affect.arousal,
-                "stress": orch.state.affect.stress,
-                "energy": orch.state.affect.energy,
-            },
-            episodic_count=orch.state.tick_counter,  # proxy: tick count ≈ record count
-            rollback=not result.success,
-        ))
+        snapshots.append(
+            CycleSnapshot(
+                tick=orch.state.tick_counter,
+                beliefs=[
+                    {"statement": b.statement, "confidence": b.confidence}
+                    for b in orch.state.self_model.beliefs
+                ],
+                affect={
+                    "valence": orch.state.affect.valence,
+                    "arousal": orch.state.affect.arousal,
+                    "stress": orch.state.affect.stress,
+                    "energy": orch.state.affect.energy,
+                },
+                episodic_count=orch.state.tick_counter,  # proxy: tick count ≈ record count
+                rollback=not result.success,
+            )
+        )
 
     return hashes, snapshots
 

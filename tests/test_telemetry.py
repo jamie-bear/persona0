@@ -30,7 +30,15 @@ def test_telemetry_emits_success_path_metrics(tmp_path):
     assert result.success
     assert default_telemetry.get_counter("cycle_total") == 1
     assert default_telemetry.get_counter("cycle_rollback_total") == 0
-    assert default_telemetry.get_timer_values("cycle_latency_ms", {"cycle_type": "fast", "correlation_id": "corr-1", "request_id": "req-1", "session_id": "sess-1"})
+    assert default_telemetry.get_timer_values(
+        "cycle_latency_ms",
+        {
+            "cycle_type": "fast",
+            "correlation_id": "corr-1",
+            "request_id": "req-1",
+            "session_id": "sess-1",
+        },
+    )
 
     entries = logger.read_all()
     assert entries[0].correlation_id == "corr-1"

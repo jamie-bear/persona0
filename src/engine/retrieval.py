@@ -1,4 +1,5 @@
 """Hybrid memory retrieval helpers for interaction cycles."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -47,7 +48,9 @@ def load_retrieval_limits() -> Dict[str, float]:
     }
 
 
-def rank_memory_candidates(memory_records: Iterable[Dict[str, Any]], top_k: int | None = None) -> List[Dict[str, Any]]:
+def rank_memory_candidates(
+    memory_records: Iterable[Dict[str, Any]], top_k: int | None = None
+) -> List[Dict[str, Any]]:
     """Rank memory records by weighted hybrid score and return top-k with explainability."""
     start = time.monotonic()
     limits = load_retrieval_limits()

@@ -4,6 +4,7 @@ Loop order contracts — authoritative step sequences for all four cycle types.
 Reference: cognitive_loop.md §2-§4
 CP-0 exit gate: deterministic ordering tests must pass for all cycle types.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -36,7 +37,7 @@ COMMIT_OR_ROLLBACK = "commit_or_rollback"
 WORLD_INGEST = "world_ingest"
 APPRAISE = "appraise"
 UPDATE_EMOTION = "update_emotion"
-UPDATE_DRIVES = "update_drives"          # NEW in v0.17
+UPDATE_DRIVES = "update_drives"  # NEW in v0.17
 GENERATE_THOUGHT = "generate_thought"
 SALIENCE_FILTER = "salience_filter"
 UPDATE_GOALS = "update_goals"
@@ -82,7 +83,7 @@ FAST_TICK_STEPS: List[str] = [
     WORLD_INGEST,
     APPRAISE,
     UPDATE_EMOTION,
-    UPDATE_DRIVES,       # after emotion, before thought generation (v0.17 spec)
+    UPDATE_DRIVES,  # after emotion, before thought generation (v0.17 spec)
     GENERATE_THOUGHT,
     SALIENCE_FILTER,
     UPDATE_GOALS,
@@ -158,9 +159,7 @@ def validate_step_ordering() -> dict[CycleType, list[str]]:
         except ValueError:
             return -1
 
-    def _assert_before(
-        ct: CycleType, steps: List[str], a: str, b: str
-    ) -> None:
+    def _assert_before(ct: CycleType, steps: List[str], a: str, b: str) -> None:
         ia, ib = _idx(steps, a), _idx(steps, b)
         if ia == -1 or ib == -1:
             return  # step not present in this cycle; skip
