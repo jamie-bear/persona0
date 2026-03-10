@@ -133,6 +133,8 @@ retrieval:
   recency_weight: 0.30
   importance_weight: 0.25
   semantic_similarity_weight: 0.30
+  self_relevance_weight: 0.15
+  # DEPRECATED: legacy alias kept for backward compatibility; prefer self_relevance_weight.
   goal_relevance_weight: 0.15
 
   # Maximum candidates before salience competition
