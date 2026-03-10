@@ -9,6 +9,7 @@ Core guarantees:
 Reference: cognitive_loop.md §8 (top-level pseudocode), self_editability_policy.md §5.1
 CP-1 exit gate: rollback leaves no persistent write residue
 """
+
 from __future__ import annotations
 
 import copy
@@ -125,7 +126,9 @@ class EgoOrchestrator:
         start_ts = time.monotonic()
         timestamp = datetime.now(timezone.utc).isoformat()
         input_event = input_event or {}
-        input_event.setdefault("_logical_timestamp", _logical_cycle_timestamp(self.state.tick_counter, cycle_type))
+        input_event.setdefault(
+            "_logical_timestamp", _logical_cycle_timestamp(self.state.tick_counter, cycle_type)
+        )
         trace = ensure_trace_context(input_event)
 
         # Step 1: Snapshot before state
@@ -159,9 +162,7 @@ class EgoOrchestrator:
             # Step 4: Validate CONST fields unchanged
             const_validation = validate_const_fields_unchanged(snapshot, self.state)
             if not const_validation.valid:
-                raise PolicyViolation(
-                    "CONST violation: " + "; ".join(const_validation.errors)
-                )
+                raise PolicyViolation("CONST violation: " + "; ".join(const_validation.errors))
 
             # Step 5: Commit — state changes made by step_fns are already applied;
             # persist any episodic writes from pending_writes context

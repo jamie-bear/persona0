@@ -5,6 +5,7 @@ and desire→goal crystallization.
 Reference: drive_system.md §3-§5, cognitive_loop.md §3.1 step 3.5, §3.2 step 11
            config/defaults.yaml [drives.*]
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -89,7 +90,7 @@ class DriveModule:
             "id": desire_id,
             "source_drive": drive_name,
             "urgency": round(drive_value, 4),
-            "approach": True,          # simplified: all desires start as approach
+            "approach": True,  # simplified: all desires start as approach
             "expires_after_ticks": 3,
             "age_in_ticks": 0,
             "created_at_tick": tick_counter,
@@ -138,9 +139,7 @@ class DriveModule:
 
         # Which drives already have an active goal?
         active_drive_goals = {
-            _goal_drive(g)
-            for g in current_goals
-            if _goal_status(g) == "active" and _goal_drive(g)
+            _goal_drive(g) for g in current_goals if _goal_status(g) == "active" and _goal_drive(g)
         }
 
         proposals: List[Dict[str, Any]] = []
@@ -160,16 +159,18 @@ class DriveModule:
             if drive in active_drive_goals:
                 continue  # existing goal satisfies this drive
 
-            proposals.append({
-                "label": f"Address {drive.replace('_', ' ')}",
-                "motive": drive,
-                "priority": round(urgency * dampen, 4),
-                "horizon": "short",
-                "progress": 0.0,
-                "crystallized_from_drive": drive,
-                "crystallized_at": f"tick:{desire.get('created_at_tick', 0)}",
-                "source_desire_id": desire.get("id"),
-            })
+            proposals.append(
+                {
+                    "label": f"Address {drive.replace('_', ' ')}",
+                    "motive": drive,
+                    "priority": round(urgency * dampen, 4),
+                    "horizon": "short",
+                    "progress": 0.0,
+                    "crystallized_from_drive": drive,
+                    "crystallized_at": f"tick:{desire.get('created_at_tick', 0)}",
+                    "source_desire_id": desire.get("id"),
+                }
+            )
             proposed_drives.add(drive)
 
         return proposals
@@ -198,17 +199,22 @@ class DriveModule:
         """Append high-urgency new desires to persisted list."""
         cfg = config if config is not None else load_drives_config()
         persistence_threshold = float(cfg.get("persistence_threshold", 0.50))
-        to_persist = [d for d in active_desires if float(d.get("urgency", 0)) >= persistence_threshold]
+        to_persist = [
+            d for d in active_desires if float(d.get("urgency", 0)) >= persistence_threshold
+        ]
         # Deduplicate by source_drive (keep highest urgency)
         by_drive: Dict[str, Dict] = {}
         for d in persisted_desires + to_persist:
             drive = d.get("source_drive", "")
-            if drive not in by_drive or float(d.get("urgency", 0)) > float(by_drive[drive].get("urgency", 0)):
+            if drive not in by_drive or float(d.get("urgency", 0)) > float(
+                by_drive[drive].get("urgency", 0)
+            ):
                 by_drive[drive] = d
         return list(by_drive.values())
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
+
 
 def _clamp(value: float) -> float:
     return max(0.0, min(1.0, value))

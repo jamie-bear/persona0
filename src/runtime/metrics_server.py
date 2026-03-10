@@ -1,4 +1,5 @@
 """Minimal metrics exporter endpoint for telemetry and SLO alerts."""
+
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -34,6 +35,9 @@ class _MetricsHandler(BaseHTTPRequestHandler):
         return
 
 
-def build_metrics_server(host: str = "0.0.0.0", port: int = 9108) -> Tuple[ThreadingHTTPServer, str]:
+def build_metrics_server(
+    host: str = "0.0.0.0",  # nosec B104
+    port: int = 9108,
+) -> Tuple[ThreadingHTTPServer, str]:
     server = ThreadingHTTPServer((host, port), _MetricsHandler)
     return server, f"http://{host}:{port}"

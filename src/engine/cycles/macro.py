@@ -6,6 +6,7 @@ be validated with stable fixtures.
 
 Reference: cognitive_loop.md §4
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -118,11 +119,11 @@ def score_evidence_sufficiency(
         episodes = [selected.get(eid, {}) for eid in reflection.get("source_episode_ids", [])]
         episodes = [e for e in episodes if e]
         count = len(episodes)
-        avg_importance = sum(float(e.get("importance", 0.0)) for e in episodes) / count if count else 0.0
+        avg_importance = (
+            sum(float(e.get("importance", 0.0)) for e in episodes) / count if count else 0.0
+        )
         unique_days = {
-            str(e.get("created_at", ""))[:10]
-            for e in episodes
-            if str(e.get("created_at", ""))
+            str(e.get("created_at", ""))[:10] for e in episodes if str(e.get("created_at", ""))
         }
         day_coverage = min(1.0, len(unique_days) / 2.0)
 
@@ -139,7 +140,11 @@ def update_self_beliefs(state: AgentState, event: Dict[str, Any], pending_writes
     Requires ≥2 independent reflections before confidence > 0.75.
     """
     threshold = float(event.get("_macro_evidence_threshold", 0.55))
-    accepted = [r for r in event.get("_macro_scored_reflections", []) if float(r.get("evidence_score", 0.0)) >= threshold]
+    accepted = [
+        r
+        for r in event.get("_macro_scored_reflections", [])
+        if float(r.get("evidence_score", 0.0)) >= threshold
+    ]
     if not accepted:
         event["_macro_accepted_reflections"] = []
         return
@@ -188,10 +193,14 @@ def update_self_beliefs(state: AgentState, event: Dict[str, Any], pending_writes
 
     event["_macro_accepted_reflections"] = accepted
     if changed:
-        pending_writes.append({"field_path": "self_model.beliefs", "author_module": "ReflectionEngine"})
+        pending_writes.append(
+            {"field_path": "self_model.beliefs", "author_module": "ReflectionEngine"}
+        )
 
 
-def decay_unreinforced_beliefs(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
+def decay_unreinforced_beliefs(
+    state: AgentState, event: Dict[str, Any], pending_writes: List
+) -> None:
     """5b. Decay confidence of beliefs not reinforced within the configured window.
 
     Reference: config/defaults.yaml reflection.confidence_decay_rate_per_cycle,
@@ -234,13 +243,16 @@ def decay_unreinforced_beliefs(state: AgentState, event: Dict[str, Any], pending
 
     # Track beliefs below archival threshold for observability
     archival_candidates = [
-        b.id for b in state.self_model.beliefs
+        b.id
+        for b in state.self_model.beliefs
         if b.source_type != "CONST_SEED" and b.confidence < archival_threshold
     ]
     event["_macro_archival_candidates"] = archival_candidates
 
     if changed:
-        pending_writes.append({"field_path": "self_model.beliefs", "author_module": "ReflectionEngine"})
+        pending_writes.append(
+            {"field_path": "self_model.beliefs", "author_module": "ReflectionEngine"}
+        )
 
 
 def _last_reinforcement_day(belief: SelfBelief, current_day: int) -> int:
@@ -303,6 +315,7 @@ def memory_compaction(state: AgentState, event: Dict[str, Any], pending_writes: 
         return
 
     from ..modules._config import load_memory_config
+
     mem_cfg = load_memory_config()
 
     importance_threshold = float(mem_cfg.get("importance_cooling_threshold", 0.15))
@@ -331,11 +344,9 @@ def goal_review(state: AgentState, event: Dict[str, Any], pending_writes: List) 
     Reference: config/defaults.yaml goals.goal_staleness_days
     """
     from ..modules._config import load_goals_config
+
     goals_cfg = load_goals_config()
     staleness_days = int(goals_cfg.get("goal_staleness_days", 30))
-    max_active = int(goals_cfg.get("max_active_goals", 8))
-
-    active = [g for g in state.goals if g.status == "active"]
     changed = False
 
     stale_ids = []
@@ -397,7 +408,9 @@ def drive_review(state: AgentState, event: Dict[str, Any], pending_writes: List)
         pending_writes.append({"field_path": "persisted_desires", "author_module": "DriveModule"})
     if state.consecutive_thought_categories:
         state.consecutive_thought_categories = []
-        pending_writes.append({"field_path": "consecutive_thought_categories", "author_module": "ThoughtGenerator"})
+        pending_writes.append(
+            {"field_path": "consecutive_thought_categories", "author_module": "ThoughtGenerator"}
+        )
 
 
 def compact_episodic_memory(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -421,9 +434,7 @@ def compact_episodic_memory(state: AgentState, event: Dict[str, Any], pending_wr
         importance_threshold=float(cfg.get("importance_cooling_threshold", 0.15)),
         decay_threshold=float(cfg.get("decay_cooling_threshold", 0.10)),
     )
-    archived = store.archive_cooled(
-        max_records=int(cfg.get("max_records_archived_per_cycle", 50))
-    )
+    archived = store.archive_cooled(max_records=int(cfg.get("max_records_archived_per_cycle", 50)))
 
     event["_macro_memory_compaction"] = {
         "enabled": True,
@@ -452,9 +463,7 @@ def _load_candidate_episodes(event: Dict[str, Any]) -> List[Dict[str, Any]]:
     return []
 
 
-def _filter_by_recency(
-    episodes: List[Dict[str, Any]], window_hours: float
-) -> List[Dict[str, Any]]:
+def _filter_by_recency(episodes: List[Dict[str, Any]], window_hours: float) -> List[Dict[str, Any]]:
     """Filter episodes to those within the recency window.
 
     Uses the latest created_at among all episodes as the reference point.
@@ -479,6 +488,7 @@ def _filter_by_recency(
         return episodes
 
     from datetime import timedelta
+
     cutoff = ref - timedelta(hours=window_hours)
     cutoff_iso = cutoff.isoformat()
 

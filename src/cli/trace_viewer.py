@@ -7,6 +7,7 @@ Usage:
 Renders the cycle log as a readable rich table showing:
   - cycle_type, timestamp, modules executed, field deltas, before/after hash
 """
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,6 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
-from rich.text import Text
 from rich import box
 
 
@@ -117,7 +117,7 @@ def render_log(log_path: Path) -> None:
     total_ms = sum(e.get("duration_ms", 0) for e in entries)
     console.print(
         f"[bold]Summary:[/bold] {total} cycles | "
-        f"{rollbacks} rollbacks ({100*rollbacks//total if total else 0}%) | "
+        f"{rollbacks} rollbacks ({100 * rollbacks // total if total else 0}%) | "
         f"total time: {total_ms}ms"
     )
 
@@ -131,8 +131,7 @@ def render_log(log_path: Path) -> None:
 def _render_policy_outcomes(entries: list) -> None:
     """Render a summary of policy check outcomes if present."""
     policy_entries = [
-        e for e in entries
-        if e.get("policy_check_result") or e.get("_policy_check_result")
+        e for e in entries if e.get("policy_check_result") or e.get("_policy_check_result")
     ]
     if not policy_entries:
         return

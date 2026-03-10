@@ -4,6 +4,7 @@ Fast tick cycle step implementations (~30 min cadence).
 Reference: cognitive_loop.md §3.1
 CP-3: all steps behavior-complete except 'appraise' (LLM-dependent, kept as stub).
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -59,10 +60,10 @@ def update_emotion(state: AgentState, event: Dict[str, Any], pending_writes: Lis
     # Store the rest_need boost for DriveModule to consume
     event["_stress_rest_boost"] = _emotion_module.stress_rest_boost(new_affect.stress)
 
-    pending_writes.append({"field_path": "affect.valence",  "author_module": "EmotionModule"})
-    pending_writes.append({"field_path": "affect.arousal",  "author_module": "EmotionModule"})
-    pending_writes.append({"field_path": "affect.stress",   "author_module": "EmotionModule"})
-    pending_writes.append({"field_path": "affect.energy",   "author_module": "EmotionModule"})
+    pending_writes.append({"field_path": "affect.valence", "author_module": "EmotionModule"})
+    pending_writes.append({"field_path": "affect.arousal", "author_module": "EmotionModule"})
+    pending_writes.append({"field_path": "affect.stress", "author_module": "EmotionModule"})
+    pending_writes.append({"field_path": "affect.energy", "author_module": "EmotionModule"})
 
 
 def update_drives(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -74,10 +75,10 @@ def update_drives(state: AgentState, event: Dict[str, Any], pending_writes: List
     )
     state.drives = new_drives
 
-    pending_writes.append({"field_path": "drives.social_need",  "author_module": "DriveModule"})
+    pending_writes.append({"field_path": "drives.social_need", "author_module": "DriveModule"})
     pending_writes.append({"field_path": "drives.mastery_need", "author_module": "DriveModule"})
-    pending_writes.append({"field_path": "drives.rest_need",    "author_module": "DriveModule"})
-    pending_writes.append({"field_path": "drives.curiosity",    "author_module": "DriveModule"})
+    pending_writes.append({"field_path": "drives.rest_need", "author_module": "DriveModule"})
+    pending_writes.append({"field_path": "drives.curiosity", "author_module": "DriveModule"})
 
 
 def generate_thought(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -93,7 +94,9 @@ def generate_thought(state: AgentState, event: Dict[str, Any], pending_writes: L
     cats = list(state.consecutive_thought_categories)
     cats.append(thought["thought_category"])
     state.consecutive_thought_categories = cats[-3:]  # keep last 3
-    pending_writes.append({"field_path": "consecutive_thought_categories", "author_module": "ThoughtGenerator"})
+    pending_writes.append(
+        {"field_path": "consecutive_thought_categories", "author_module": "ThoughtGenerator"}
+    )
 
 
 def salience_filter(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -117,7 +120,9 @@ def salience_filter(state: AgentState, event: Dict[str, Any], pending_writes: Li
             candidates.append(rid)
 
     state.attention.salience_buffer = candidates[:capacity]
-    pending_writes.append({"field_path": "attention.salience_buffer", "author_module": "SalienceGate"})
+    pending_writes.append(
+        {"field_path": "attention.salience_buffer", "author_module": "SalienceGate"}
+    )
 
 
 def update_goals(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

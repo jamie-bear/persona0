@@ -4,6 +4,7 @@ ThoughtGenerator — deterministic category selection and template-based thought
 Reference: cognitive_loop.md §3.1 step 4 (GENERATE_THOUGHT)
            drive_system.md §7 (desire → thought category mapping)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -13,8 +14,15 @@ from typing import Any, Dict, List
 from ...schema.state import AgentState, AffectState, DriveState
 
 # Thought categories (from ego_data.md §2.2)
-CATEGORIES = ["reflection", "planning", "rumination", "curiosity",
-              "self-evaluation", "social", "fantasy"]
+CATEGORIES = [
+    "reflection",
+    "planning",
+    "rumination",
+    "curiosity",
+    "self-evaluation",
+    "social",
+    "fantasy",
+]
 
 # Templates per category: 4 slots so we can vary by tick parity
 _TEMPLATES: Dict[str, List[str]] = {
@@ -64,14 +72,14 @@ _TEMPLATES: Dict[str, List[str]] = {
 
 # Mapping from source_drive + approach to thought category (drive_system.md §7)
 _DESIRE_CATEGORY_MAP: Dict[str, str] = {
-    "social_need:approach":   "social",
-    "social_need:avoidance":  "rumination",
-    "mastery_need:approach":  "planning",
+    "social_need:approach": "social",
+    "social_need:avoidance": "rumination",
+    "mastery_need:approach": "planning",
     "mastery_need:avoidance": "self-evaluation",
-    "rest_need:approach":     "fantasy",
-    "rest_need:avoidance":    "rumination",
-    "curiosity:approach":     "curiosity",
-    "curiosity:avoidance":    "rumination",
+    "rest_need:approach": "fantasy",
+    "rest_need:avoidance": "rumination",
+    "curiosity:approach": "curiosity",
+    "curiosity:avoidance": "rumination",
 }
 
 _GUARDRAIL_LENGTH = 3  # max consecutive same-category thoughts before override
@@ -124,9 +132,8 @@ class ThoughtGenerator:
 
     def _apply_guardrail(self, candidate: str, recent_categories: List[str]) -> str:
         """Override candidate if last _GUARDRAIL_LENGTH categories are identical."""
-        if (
-            len(recent_categories) >= _GUARDRAIL_LENGTH
-            and all(c == candidate for c in recent_categories[-_GUARDRAIL_LENGTH:])
+        if len(recent_categories) >= _GUARDRAIL_LENGTH and all(
+            c == candidate for c in recent_categories[-_GUARDRAIL_LENGTH:]
         ):
             # Pick the next category that differs
             for alt in CATEGORIES:
@@ -179,8 +186,6 @@ class ThoughtGenerator:
             "trigger": trigger,
             "source_desire_drive": source_desire_drive,
             "text": text,
-            "intrusiveness": round(
-                min(1.0, 0.3 + abs(state.affect.valence - 0.1) * 0.3), 4
-            ),
+            "intrusiveness": round(min(1.0, 0.3 + abs(state.affect.valence - 0.1) * 0.3), 4),
             "thought_category": category,
         }

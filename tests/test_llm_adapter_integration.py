@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 
 from src.engine.adapters import llm
 from src.engine.cycles.fast_tick import appraise
@@ -29,11 +28,14 @@ def test_adapter_timeout_retry_behavior(monkeypatch):
             raise llm.AdapterTimeoutError("timed out")
         return "Recovered after retry"
 
-    monkeypatch.setattr("src.engine.adapters.llm.load_config_section", lambda section: {
-        "provider": "mock",
-        "retries": 2,
-        "timeout_seconds": 1,
-    })
+    monkeypatch.setattr(
+        "src.engine.adapters.llm.load_config_section",
+        lambda section: {
+            "provider": "mock",
+            "retries": 2,
+            "timeout_seconds": 1,
+        },
+    )
     monkeypatch.setattr("src.engine.adapters.llm._call_provider", flaky_provider)
 
     result = llm.generate_response({"user_turn": "x"}, state)
@@ -88,10 +90,13 @@ def test_fast_tick_appraise_populates_validated_structured_outputs(monkeypatch):
 
 
 def test_adapter_appraisal_validation_filters_and_clamps(monkeypatch):
-    monkeypatch.setattr("src.engine.adapters.llm.load_config_section", lambda section: {
-        "provider": "mock",
-        "retries": 0,
-    })
+    monkeypatch.setattr(
+        "src.engine.adapters.llm.load_config_section",
+        lambda section: {
+            "provider": "mock",
+            "retries": 0,
+        },
+    )
     monkeypatch.setattr(
         "src.engine.adapters.llm._call_provider",
         lambda operation, payload, cfg: [

@@ -3,6 +3,7 @@ Agent state schema — the complete runtime state of the Ego Engine.
 
 Reference: architecture.md §3 (canonical state schema), self_editability_policy.md §3
 """
+
 from __future__ import annotations
 
 from typing import Annotated, List, Optional
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field, model_validator
 # ─────────────────────────────────────────────────────────────────────────────
 # Sub-schemas
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class AffectState(BaseModel):
     """Emotional affect variables. Mutability: SELF / EmotionModule."""
@@ -124,6 +126,7 @@ class SelfModelState(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # Root agent state
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class AgentState(BaseModel):
     """Complete runtime state of the Ego Engine.

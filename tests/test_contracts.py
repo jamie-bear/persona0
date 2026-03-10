@@ -7,11 +7,10 @@ Tests:
 3. Same cycle type always returns the same step sequence
 4. Specific required steps are present in each cycle type
 """
+
 from src.engine.contracts import (
     CYCLE_CONTRACTS,
     CycleType,
-    APPRAISE,
-    BUILD_CONTEXT_PACKAGE,
     COMMIT_OR_ROLLBACK,
     DESIRE_GENERATION,
     FAST_TICK_STEPS,
@@ -103,6 +102,7 @@ def test_slow_tick_contains_fast_tick_core():
 def test_macro_self_belief_update_after_evidence_score():
     """Macro: UPDATE_SELF_BELIEFS must come after evidence scoring."""
     from src.engine.contracts import SCORE_EVIDENCE_SUFFICIENCY, ARCHIVE_REFLECTION
+
     steps = MACRO_STEPS
     score_idx = steps.index(SCORE_EVIDENCE_SUFFICIENCY)
     update_idx = steps.index(UPDATE_SELF_BELIEFS)

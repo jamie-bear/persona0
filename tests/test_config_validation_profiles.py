@@ -42,7 +42,9 @@ def test_prod_profile_validates_with_api_key(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.llm_adapter.api_key is not None
 
 
-def test_env_overrides_take_precedence_over_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_env_overrides_take_precedence_over_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     override_file = tmp_path / "override.yaml"
     override_file.write_text("llm_adapter:\n  model: from-file\n", encoding="utf-8")
 
@@ -55,7 +57,9 @@ def test_env_overrides_take_precedence_over_files(monkeypatch: pytest.MonkeyPatc
     assert settings.llm_adapter.model == "from-env"
 
 
-def test_sensitive_values_rejected_in_config_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_sensitive_values_rejected_in_config_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     bad_file = tmp_path / "bad.yaml"
     bad_file.write_text("llm_adapter:\n  api_key: leaked\n", encoding="utf-8")
 

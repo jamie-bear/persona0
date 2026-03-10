@@ -5,6 +5,7 @@ Reference: cognitive_loop.md §3.1 step 6 (UPDATE_GOALS)
            self_editability_policy.md §3.2 (goals mutability)
            config/defaults.yaml [goals.*]
 """
+
 from __future__ import annotations
 
 
@@ -56,11 +57,15 @@ class GoalSystem:
             if frustration >= suspension_threshold:
                 status = "suspended"
 
-            updated.append(goal.model_copy(update={
-                "progress": round(progress, 4),
-                "frustration": round(frustration, 4),
-                "status": status,
-            }))
+            updated.append(
+                goal.model_copy(
+                    update={
+                        "progress": round(progress, 4),
+                        "frustration": round(frustration, 4),
+                        "status": status,
+                    }
+                )
+            )
         return updated
 
     def accept_proposal(
@@ -108,5 +113,5 @@ class GoalSystem:
             status="active",
             crystallized_from_drive=drive or None,
             crystallized_at=crystallized_at or None,
-            created_at=crystallized_at or None,
+            created_at=crystallized_at or "",
         )

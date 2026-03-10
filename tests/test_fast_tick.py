@@ -6,6 +6,7 @@ All tests are isolated from the orchestrator.
 
 Reference: Phase 3 plan — Part D (tests/test_fast_tick.py)
 """
+
 from __future__ import annotations
 
 import pytest
@@ -16,6 +17,7 @@ from src.engine.modules.thought import ThoughtGenerator, CATEGORIES
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _make_drives(**kwargs) -> DriveState:
     defaults = dict(social_need=0.20, mastery_need=0.15, rest_need=0.10, curiosity=0.30)
@@ -29,8 +31,9 @@ def _make_affect(**kwargs) -> AffectState:
     return AffectState(**defaults)
 
 
-def _make_goal(status="active", blocked_by=None, frustration=0.0,
-               progress=0.0, drive=None) -> GoalRecord:
+def _make_goal(
+    status="active", blocked_by=None, frustration=0.0, progress=0.0, drive=None
+) -> GoalRecord:
     return GoalRecord(
         id="g1",
         label="Test goal",
@@ -45,13 +48,13 @@ def _make_goal(status="active", blocked_by=None, frustration=0.0,
 
 # ── EmotionModule ─────────────────────────────────────────────────────────────
 
+
 class TestEmotionModule:
     module = EmotionModule()
 
     def test_emotion_decays_toward_baseline(self):
         """After 20 ticks with no appraisals, all variables approach baseline."""
         affect = AffectState(valence=-0.8, arousal=0.9, stress=0.9, energy=0.0)
-        baseline = dict(valence=0.10, arousal=0.30, stress=0.10, energy=0.70)
         for tick in range(20):
             affect = self.module.update(affect, [], tick_counter=tick)
         assert affect.valence > -0.8, "valence should move toward baseline"
@@ -111,6 +114,7 @@ class TestEmotionModule:
 
 # ── DriveModule ───────────────────────────────────────────────────────────────
 
+
 class TestDriveModule:
     module = DriveModule()
 
@@ -157,8 +161,7 @@ class TestDriveModule:
 
     def test_satisfaction_map_correct_per_drive(self):
         """One event per drive type causes the correct drive to reduce."""
-        drives = _make_drives(social_need=0.80, mastery_need=0.80,
-                               rest_need=0.80, curiosity=0.80)
+        drives = _make_drives(social_need=0.80, mastery_need=0.80, rest_need=0.80, curiosity=0.80)
         # conversation → social_need
         d1 = self.module.update(drives, [{"type": "conversation"}])
         assert d1.social_need < drives.social_need
@@ -237,6 +240,7 @@ class TestDriveModule:
 
 
 # ── ThoughtGenerator ──────────────────────────────────────────────────────────
+
 
 class TestThoughtGenerator:
     gen = ThoughtGenerator()
@@ -325,8 +329,10 @@ class TestThoughtGenerator:
 
 # ── GoalSystem ────────────────────────────────────────────────────────────────
 
+
 class TestGoalSystem:
     from src.engine.modules.goal import GoalSystem
+
     system = GoalSystem()
 
     def test_goal_progress_ticks_when_not_blocked(self):
@@ -381,7 +387,9 @@ class TestGoalSystem:
     def test_accept_proposal_rejected_when_drive_already_has_goal(self):
         """Proposal rejected if an active goal for the same drive exists."""
         existing = GoalRecord(
-            id="g1", label="existing", status="active",
+            id="g1",
+            label="existing",
+            status="active",
             crystallized_from_drive="social_need",
         )
         proposal = {"crystallized_from_drive": "social_need", "label": "new"}
@@ -391,8 +399,9 @@ class TestGoalSystem:
     def test_accept_proposal_rejected_at_max_goals(self):
         """Proposal rejected when active goal count equals max_active_goals."""
         active_goals = [
-            GoalRecord(id=f"g{i}", label=f"g{i}", status="active",
-                       crystallized_from_drive=f"drive_{i}")
+            GoalRecord(
+                id=f"g{i}", label=f"g{i}", status="active", crystallized_from_drive=f"drive_{i}"
+            )
             for i in range(8)
         ]
         proposal = {"crystallized_from_drive": "new_drive", "label": "new"}

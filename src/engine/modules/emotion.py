@@ -5,6 +5,7 @@ Reference: cognitive_loop.md §3.1 step 3 (UPDATE_EMOTION)
            architecture.md §2 (Emotional Regulation module)
            config/defaults.yaml [affect.*]
 """
+
 from __future__ import annotations
 
 import math
@@ -50,8 +51,8 @@ class EmotionModule:
         # -- 1. EMA decay toward baseline --
         valence = _ema(affect.valence, baseline.get("valence", 0.10), decay.get("valence", 0.05))
         arousal = _ema(affect.arousal, baseline.get("arousal", 0.30), decay.get("arousal", 0.08))
-        stress  = _ema(affect.stress,  baseline.get("stress",  0.10), decay.get("stress",  0.06))
-        energy  = _ema(affect.energy,  baseline.get("energy",  0.70), decay.get("energy",  0.04))
+        stress = _ema(affect.stress, baseline.get("stress", 0.10), decay.get("stress", 0.06))
+        energy = _ema(affect.energy, baseline.get("energy", 0.70), decay.get("energy", 0.04))
 
         # -- 2. Circadian energy modulation --
         fast_interval_s = float(tick_cfg.get("fast_interval_seconds", 1800))
@@ -64,10 +65,10 @@ class EmotionModule:
         # -- 3. Appraisal-driven deltas --
         for appraisal in appraisal_results:
             goal_congruence = float(appraisal.get("goal_congruence", 0.0))
-            threat          = float(appraisal.get("threat", 0.0))
-            arousal_cue     = float(appraisal.get("arousal_cue", 0.0))
+            threat = float(appraisal.get("threat", 0.0))
+            arousal_cue = float(appraisal.get("arousal_cue", 0.0))
             valence += goal_congruence * 0.10
-            stress  += threat * 0.10
+            stress += threat * 0.10
             arousal += arousal_cue * 0.05
 
         # -- 4. Clamp --
@@ -95,6 +96,7 @@ class EmotionModule:
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
+
 
 def _ema(value: float, baseline: float, rate: float) -> float:
     """Pull value toward baseline by rate (EMA step)."""

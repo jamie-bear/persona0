@@ -1,4 +1,5 @@
 """In-memory vector store adapter for memory retrieval."""
+
 from __future__ import annotations
 
 import math

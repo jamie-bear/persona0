@@ -6,6 +6,7 @@ generation, and desire generation / crystallization.
 
 Reference: cognitive_loop.md §3.2
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -43,14 +44,14 @@ def _select_activity(energy: float) -> str:
 
 # ── Routine event templates per activity ─────────────────────────────────────
 _ROUTINE_TEMPLATES: Dict[str, str] = {
-    "rest":                  "Resting quietly, letting the mind settle.",
+    "rest": "Resting quietly, letting the mind settle.",
     "low_arousal_idle_period": "Spending some time in low-stimulation idle.",
-    "reading":               "Reading and following a thread of curiosity.",
-    "task_completion":       "Working through something that requires focus.",
-    "conversation":          "Having a conversation with someone.",
-    "social_activity":       "Spending time in a social context.",
-    "sleep":                 "Sleeping and recovering.",
-    "idle":                  "Passing time without a particular focus.",
+    "reading": "Reading and following a thread of curiosity.",
+    "task_completion": "Working through something that requires focus.",
+    "conversation": "Having a conversation with someone.",
+    "social_activity": "Spending time in a social context.",
+    "sleep": "Sleeping and recovering.",
+    "idle": "Passing time without a particular focus.",
 }
 
 
@@ -62,7 +63,9 @@ def activity_transition(state: AgentState, event: Dict[str, Any], pending_writes
     new_activity = _select_activity(state.affect.energy)
     state.activity.current_activity = new_activity
     event["_new_activity"] = new_activity
-    pending_writes.append({"field_path": "activity.current_activity", "author_module": "ActivitySelector"})
+    pending_writes.append(
+        {"field_path": "activity.current_activity", "author_module": "ActivitySelector"}
+    )
 
 
 def routine_event(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -153,4 +156,4 @@ def desire_generation(state: AgentState, event: Dict[str, Any], pending_writes: 
         persisted_desires=aged,
     )
     pending_writes.append({"field_path": "persisted_desires", "author_module": "DriveModule"})
-    pending_writes.append({"field_path": "active_desires",    "author_module": "DriveModule"})
+    pending_writes.append({"field_path": "active_desires", "author_module": "DriveModule"})

@@ -3,6 +3,7 @@ Mutability class registry and field ownership enforcement.
 
 Reference: self_editability_policy.md §2-§5
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -118,6 +119,7 @@ class FieldOwnershipRegistry:
 # Default registry — loaded at bootstrap
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def build_default_registry() -> FieldOwnershipRegistry:
     """Construct the canonical field ownership registry from the spec.
 
@@ -145,7 +147,11 @@ def build_default_registry() -> FieldOwnershipRegistry:
         ("self_model.beliefs[].confidence", "ReflectionEngine", "Confidence delta; rate-limited"),
         ("self_model.beliefs[].statement", "ReflectionEngine", "Belief statement text"),
         ("self_model.beliefs[].last_challenged_at", "AppraisalModule", "Staleness reset"),
-        ("self_model.beliefs[].stability", "ReflectionEngine", "Derived from confidence trajectory"),
+        (
+            "self_model.beliefs[].stability",
+            "ReflectionEngine",
+            "Derived from confidence trajectory",
+        ),
         # Goals
         ("goals[].progress", "GoalSystem", "Goal progress [0,1]"),
         ("goals[].frustration", "GoalSystem", "Goal frustration [0,1]"),
@@ -186,7 +192,11 @@ def build_default_registry() -> FieldOwnershipRegistry:
         ("attention.current_focus", "SalienceGate", "Current focus topic"),
         ("active_desires", "DriveModule", "Ephemeral desire objects; not persisted"),
         ("persisted_desires", "DriveModule", "Desires carried across slow ticks; not long-term"),
-        ("consecutive_thought_categories", "ThoughtGenerator", "Last N thought categories; cleared at macro cycle"),
+        (
+            "consecutive_thought_categories",
+            "ThoughtGenerator",
+            "Last N thought categories; cleared at macro cycle",
+        ),
         ("appraisal_results", "AppraisalModule", "Per-tick appraisal outputs"),
         ("context_package", "ContextBuilder", "Assembled prompt context; discarded after render"),
         ("candidate_response", "LLMRenderer", "Draft response; discarded on commit/rollback"),

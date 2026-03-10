@@ -8,15 +8,14 @@ Tests:
 4. validate_proposed_writes rejects CONST writes
 5. validate_const_fields_unchanged detects CONST mutations
 """
+
 import json
 from pathlib import Path
 
 import pytest
 
 from src.schema.mutability import (
-    DEFAULT_REGISTRY,
     MutabilityClass,
-    MutabilityViolation,
     build_default_registry,
 )
 from src.schema.state import AgentState
@@ -34,6 +33,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # ─────────────────────────────────────────────────────────────────────────────
 # Schema validation
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_sample_state_validates():
     """AgentState must validate against the sample_state.json fixture."""
@@ -56,8 +56,6 @@ def test_affect_bounds_enforced():
     result = validate_state_packet(data)
     assert not result.valid
     assert any("valence" in e for e in result.errors)
-
-
 
 
 def test_founding_traits_require_structured_objects():
@@ -89,6 +87,7 @@ def test_bootstrap_seeds_beliefs_from_founding_traits():
         assert belief.confidence == trait.initial_confidence
         assert belief.source_type == "CONST_SEED"
 
+
 def test_drive_bounds_enforced():
     """Pydantic should reject drive values outside [0, 1]."""
     data = json.loads((FIXTURES / "sample_state.json").read_text())
@@ -101,6 +100,7 @@ def test_drive_bounds_enforced():
 # ─────────────────────────────────────────────────────────────────────────────
 # Mutability registry
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_no_ownership_conflicts():
     """CP-0 exit gate: field ownership conflicts must equal 0."""
@@ -152,6 +152,7 @@ def test_eph_fields_registered():
 def test_duplicate_registration_raises():
     """Registering the same field twice must raise ValueError."""
     from src.schema.mutability import FieldOwnership, FieldOwnershipRegistry
+
     r = FieldOwnershipRegistry()
     fo = FieldOwnership("test.field", MutabilityClass.SELF, "TestModule")
     r.register(fo)
@@ -162,6 +163,7 @@ def test_duplicate_registration_raises():
 # ─────────────────────────────────────────────────────────────────────────────
 # Write validation
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_const_write_rejected():
     """Proposed writes to CONST fields must be rejected."""
@@ -208,6 +210,7 @@ def test_unregistered_field_flagged():
 # ─────────────────────────────────────────────────────────────────────────────
 # CONST field protection
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_const_unchanged_passes():
     """validate_const_fields_unchanged passes when CONST fields are identical."""

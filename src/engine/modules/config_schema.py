@@ -1,4 +1,5 @@
 """Strict runtime configuration schema."""
+
 from __future__ import annotations
 
 from typing import Literal

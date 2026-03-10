@@ -1,4 +1,5 @@
 """Telemetry primitives for counters, timings, trace context, and SLO alerts."""
+
 from __future__ import annotations
 
 import threading
@@ -9,7 +10,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from statistics import mean
-from typing import DefaultDict, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import DefaultDict, Dict, Iterator, List, Optional, Tuple
 
 LabelSet = Tuple[Tuple[str, str], ...]
 
@@ -33,19 +34,27 @@ def _labelset(labels: Optional[Dict[str, str]] = None) -> LabelSet:
 class TelemetryCollector:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._counters: DefaultDict[str, DefaultDict[LabelSet, float]] = defaultdict(lambda: defaultdict(float))
-        self._timers_ms: DefaultDict[str, DefaultDict[LabelSet, List[float]]] = defaultdict(lambda: defaultdict(list))
+        self._counters: DefaultDict[str, DefaultDict[LabelSet, float]] = defaultdict(
+            lambda: defaultdict(float)
+        )
+        self._timers_ms: DefaultDict[str, DefaultDict[LabelSet, List[float]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
 
     def reset(self) -> None:
         with self._lock:
             self._counters.clear()
             self._timers_ms.clear()
 
-    def increment(self, name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None) -> None:
+    def increment(
+        self, name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None
+    ) -> None:
         with self._lock:
             self._counters[name][_labelset(labels)] += value
 
-    def observe_ms(self, name: str, duration_ms: float, labels: Optional[Dict[str, str]] = None) -> None:
+    def observe_ms(
+        self, name: str, duration_ms: float, labels: Optional[Dict[str, str]] = None
+    ) -> None:
         with self._lock:
             self._timers_ms[name][_labelset(labels)].append(float(duration_ms))
 
@@ -59,11 +68,13 @@ class TelemetryCollector:
 
     def get_counter(self, name: str, labels: Optional[Dict[str, str]] = None) -> float:
         with self._lock:
-            return self._counters.get(name, {}).get(_labelset(labels), 0.0)
+            counter_map = self._counters.get(name)
+            return counter_map.get(_labelset(labels), 0.0) if counter_map is not None else 0.0
 
     def get_timer_values(self, name: str, labels: Optional[Dict[str, str]] = None) -> List[float]:
         with self._lock:
-            return list(self._timers_ms.get(name, {}).get(_labelset(labels), []))
+            timer_map = self._timers_ms.get(name)
+            return list(timer_map.get(_labelset(labels), [])) if timer_map is not None else []
 
     def format_prometheus(self) -> str:
         lines: List[str] = []
@@ -89,11 +100,29 @@ class TelemetryCollector:
         latencies = self.get_timer_values("cycle_latency_ms")
 
         if total_cycles >= 5 and total_cycles > 0 and (rollbacks / total_cycles) > 0.2:
-            alerts.append({"name": "rollback_spike", "severity": "critical", "value": f"{rollbacks/total_cycles:.2%}"})
+            alerts.append(
+                {
+                    "name": "rollback_spike",
+                    "severity": "critical",
+                    "value": f"{rollbacks / total_cycles:.2%}",
+                }
+            )
         if len(latencies) >= 5 and (sum(latencies) / len(latencies)) > 500.0:
-            alerts.append({"name": "latency_regression", "severity": "warning", "value": f"{sum(latencies)/len(latencies):.1f}ms"})
+            alerts.append(
+                {
+                    "name": "latency_regression",
+                    "severity": "warning",
+                    "value": f"{sum(latencies) / len(latencies):.1f}ms",
+                }
+            )
         if total_cycles >= 5 and total_cycles > 0 and (policy_blocks / total_cycles) > 0.1:
-            alerts.append({"name": "policy_block_anomaly", "severity": "warning", "value": f"{policy_blocks/total_cycles:.2%}"})
+            alerts.append(
+                {
+                    "name": "policy_block_anomaly",
+                    "severity": "warning",
+                    "value": f"{policy_blocks / total_cycles:.2%}",
+                }
+            )
         return alerts
 
 
@@ -139,7 +168,9 @@ def ensure_trace_context(event: Dict[str, object]) -> TraceContext:
         event["request_id"] = request_id
     if session_id is not None:
         event["session_id"] = session_id
-    trace = TraceContext(correlation_id=correlation_id, request_id=request_id, session_id=session_id)
+    trace = TraceContext(
+        correlation_id=correlation_id, request_id=request_id, session_id=session_id
+    )
     set_trace_context(trace)
     return trace
 

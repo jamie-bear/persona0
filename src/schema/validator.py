@@ -5,6 +5,7 @@ Reference:
 - self_editability_policy.md §5.1 (pre-commit validation)
 - execution_checkpoints.md CP-0 exit gate
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,7 +13,7 @@ from typing import Any, Dict, List
 
 from pydantic import ValidationError
 
-from .mutability import FieldOwnershipRegistry, MutabilityClass, MutabilityViolation
+from .mutability import FieldOwnershipRegistry, MutabilityViolation
 from .state import AgentState
 
 
@@ -36,7 +37,7 @@ def validate_state_packet(data: Dict[str, Any]) -> ValidationResult:
         AgentState.model_validate(data)
     except ValidationError as exc:
         for err in exc.errors():
-            result.add_error(f"schema: {'.'.join(str(l) for l in err['loc'])}: {err['msg']}")
+            result.add_error(f"schema: {'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}")
     return result
 
 
@@ -72,9 +73,7 @@ def validate_proposed_writes(
         except MutabilityViolation as exc:
             result.add_error(str(exc))
         except KeyError:
-            result.add_error(
-                f"UNREGISTERED FIELD: field='{field_path}' author='{author}'"
-            )
+            result.add_error(f"UNREGISTERED FIELD: field='{field_path}' author='{author}'")
     return result
 
 
