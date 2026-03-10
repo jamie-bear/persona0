@@ -6,12 +6,10 @@ CP-3: all steps behavior-complete except 'appraise' (LLM-dependent, kept as stub
 """
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState
-from ._store_helpers import try_store_append
+from ._store_helpers import deterministic_record_metadata, next_record_sequence_index, try_store_append
 from ..modules.emotion import EmotionModule
 from ..modules.drive import DriveModule
 from ..modules.thought import ThoughtGenerator
@@ -125,10 +123,16 @@ def write_memory(state: AgentState, event: Dict[str, Any], pending_writes: List)
     if not thought:
         return
 
-    now = datetime.now(timezone.utc).isoformat()
+    metadata = deterministic_record_metadata(
+        state,
+        event,
+        cycle_type="fast_tick",
+        record_type="thought",
+        sequence_index=next_record_sequence_index(event),
+    )
     record = {
-        "id": thought.get("id", str(uuid.uuid4())),
-        "created_at": now,
+        "id": metadata["id"],
+        "created_at": metadata["created_at"],
         "cycle_id": event.get("_cycle_id", ""),
         "author_module": "Orchestrator",
         "event_text": thought.get("text", ""),

@@ -8,18 +8,39 @@ Tests:
 """
 import json
 from pathlib import Path
+import tempfile
 from typing import List
-
-import pytest
 
 from src.engine.contracts import CycleType
 from src.engine.cycle_log import hash_state
+from src.engine.default_setup import register_default_steps
 from src.engine.orchestrator import EgoOrchestrator
 from src.schema.state import AgentState
+from src.store.episodic_store import EpisodicStore
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
+def _run_sequence_with_records(seed_state: dict, cycles: list) -> tuple[List[str], List[dict]]:
+    """Run cycles with a real episodic store and return hashes + record metadata."""
+    state = AgentState.model_validate(seed_state)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = EpisodicStore(Path(tmpdir) / "episodic.sqlite")
+        orch = register_default_steps(EgoOrchestrator(state), store=store)
+        hashes = []
+        for cycle_spec in cycles:
+            cycle_type = CycleType(cycle_spec["type"])
+            orch.run_cycle(cycle_type, cycle_spec.get("input", {}))
+            hashes.append(hash_state(orch.state))
+
+        rows = store._conn.execute(
+            "SELECT id, created_at, cycle_id FROM episodic_log ORDER BY created_at ASC, id ASC"
+        ).fetchall()
+        records = [
+            {"id": row["id"], "created_at": row["created_at"], "cycle_id": row["cycle_id"]}
+            for row in rows
+        ]
+    return hashes, records
 
 def _run_sequence(seed_state: dict, cycles: list) -> List[str]:
     """Run a sequence of cycles and return the list of state hashes after each cycle."""
@@ -111,3 +132,16 @@ class TestDeterminism:
             orch_b.run_cycle(CycleType(cycle_spec["type"]))
 
         assert orch_a.state.tick_counter == orch_b.state.tick_counter == n_cycles
+
+    def test_episodic_metadata_deterministic(self):
+        """Episodic record id/created_at fields must be replay-deterministic."""
+        fixture = json.loads((FIXTURES / "synthetic_day.json").read_text())
+        seed = fixture["seed_state"]
+        cycles = fixture["cycles"]
+
+        _, records_run1 = _run_sequence_with_records(seed, cycles)
+        _, records_run2 = _run_sequence_with_records(seed, cycles)
+
+        assert records_run1 == records_run2
+        assert records_run1, "Expected at least one episodic record in synthetic_day replay"
+

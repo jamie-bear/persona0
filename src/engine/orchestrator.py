@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from ..schema.mutability import DEFAULT_REGISTRY, FieldOwnershipRegistry, MutabilityViolation
@@ -56,6 +56,14 @@ class CycleResult:
 
 
 StepFn = Any  # Callable[[AgentState, dict, list], None]
+
+
+def _logical_cycle_timestamp(tick_counter: int, cycle_type: CycleType) -> str:
+    """Derive a deterministic cycle timestamp from tick index + cycle type."""
+    order = {"interaction": 0, "fast_tick": 1, "slow_tick": 2, "macro": 3}
+    base = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    dt = base + timedelta(minutes=(tick_counter * 60) + (order.get(cycle_type.value, 9) * 10))
+    return dt.isoformat()
 
 
 class EgoOrchestrator:
@@ -109,6 +117,7 @@ class EgoOrchestrator:
         start_ts = time.monotonic()
         timestamp = datetime.now(timezone.utc).isoformat()
         input_event = input_event or {}
+        input_event.setdefault("_logical_timestamp", _logical_cycle_timestamp(self.state.tick_counter, cycle_type))
 
         # Step 1: Snapshot before state
         snapshot = self.state.model_copy(deep=True)
