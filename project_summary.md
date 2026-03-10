@@ -20,7 +20,7 @@ Three stores with provenance tracking:
 
 Retrieval uses a weighted hybrid score:
 ```
-score = similarity×w₁ + recency×w₂ + importance×w₃ + emotional_resonance×w₄
+score = similarity×w₁ + recency×w₂ + importance×w₃ + self_relevance×w₄
 ```
 Every retrieved memory carries `why_selected` metadata for explainability.
 

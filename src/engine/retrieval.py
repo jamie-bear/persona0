@@ -29,7 +29,13 @@ def load_weights() -> RetrievalWeights:
         similarity=float(retrieval_cfg.get("semantic_similarity_weight", 0.30)),
         recency=float(retrieval_cfg.get("recency_weight", 0.30)),
         importance=float(retrieval_cfg.get("importance_weight", 0.25)),
-        self_relevance=float(retrieval_cfg.get("goal_relevance_weight", 0.15)),
+        # Prefer canonical self_relevance_weight; fall back to legacy goal_relevance_weight.
+        self_relevance=float(
+            retrieval_cfg.get(
+                "self_relevance_weight",
+                retrieval_cfg.get("goal_relevance_weight", 0.15),
+            )
+        ),
     )
 
 
@@ -57,6 +63,7 @@ def rank_memory_candidates(memory_records: Iterable[Dict[str, Any]], top_k: int 
 
         similarity = float(record.get("similarity", 0.0))
         recency = float(record.get("recency", 0.0))
+        # Prefer canonical self_relevance per record; retain goal_relevance for backward compatibility.
         self_relevance = float(record.get("self_relevance", record.get("goal_relevance", 0.0)))
 
         score = (
