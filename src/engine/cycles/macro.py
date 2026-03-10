@@ -286,6 +286,40 @@ def archive_reflection(state: AgentState, event: Dict[str, Any], pending_writes:
     pending_writes.append({"field_path": "semantic_store", "author_module": "ReflectionEngine"})
 
 
+def memory_compaction(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
+    """6b. Memory compaction — cool and archive low-signal episodic records.
+
+    Calls cool_records() and archive_cooled() on the injected EpisodicStore.
+    Reference: config/defaults.yaml memory.* parameters
+    """
+    store = event.get("_store")
+    if store is None or not hasattr(store, "cool_records"):
+        event["_macro_compaction"] = {"cooled": 0, "archived": 0, "skipped": True}
+        return
+
+    from ..modules._config import load_memory_config
+    mem_cfg = load_memory_config()
+
+    importance_threshold = float(mem_cfg.get("importance_cooling_threshold", 0.15))
+    decay_threshold = float(mem_cfg.get("decay_cooling_threshold", 0.10))
+    max_cooled = int(mem_cfg.get("max_records_cooled_per_cycle", 100))
+    max_archived = int(mem_cfg.get("max_records_archived_per_cycle", 50))
+
+    cooled = store.cool_records(
+        max_records=max_cooled,
+        importance_threshold=importance_threshold,
+        decay_threshold=decay_threshold,
+    )
+    archived = store.archive_cooled(max_records=max_archived)
+
+    event["_macro_compaction"] = {
+        "cooled": len(cooled),
+        "archived": len(archived),
+        "cooled_ids": cooled,
+        "archived_ids": archived,
+    }
+
+
 def goal_review(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
     """7. Goal review — staleness check, frustration archival, observability summary.
 
@@ -358,6 +392,7 @@ def drive_review(state: AgentState, event: Dict[str, Any], pending_writes: List)
         pending_writes.append({"field_path": "persisted_desires", "author_module": "DriveModule"})
     if state.consecutive_thought_categories:
         state.consecutive_thought_categories = []
+        pending_writes.append({"field_path": "consecutive_thought_categories", "author_module": "ThoughtGenerator"})
 
 
 def compact_episodic_memory(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

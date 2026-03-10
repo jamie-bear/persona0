@@ -121,6 +121,91 @@ def render_log(log_path: Path) -> None:
         f"total time: {total_ms}ms"
     )
 
+    # Policy outcome details (CP-5)
+    _render_policy_outcomes(entries)
+
+    # Macro-cycle observability details
+    _render_macro_details(entries)
+
+
+def _render_policy_outcomes(entries: list) -> None:
+    """Render a summary of policy check outcomes if present."""
+    policy_entries = [
+        e for e in entries
+        if e.get("policy_check_result") or e.get("_policy_check_result")
+    ]
+    if not policy_entries:
+        return
+
+    table = Table(
+        title="Policy Check Outcomes",
+        box=box.SIMPLE_HEAD,
+        show_lines=True,
+    )
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Cycle", style="cyan", width=12)
+    table.add_column("Passed", width=8)
+    table.add_column("Blocked", style="red", width=8)
+    table.add_column("Warnings", style="yellow", width=9)
+    table.add_column("Block Categories", overflow="fold")
+
+    for i, entry in enumerate(policy_entries, 1):
+        result = entry.get("policy_check_result") or entry.get("_policy_check_result", {})
+        passed = result.get("passed", True)
+        table.add_row(
+            str(i),
+            entry.get("cycle_type", "?"),
+            "[green]YES[/green]" if passed else "[red]NO[/red]",
+            str(result.get("blocked", 0)),
+            str(result.get("warnings", 0)),
+            ", ".join(result.get("block_categories", [])) or "—",
+        )
+
+    console.print(table)
+
+
+def _render_macro_details(entries: list) -> None:
+    """Render macro-cycle specific observability data."""
+    macro_entries = [e for e in entries if e.get("cycle_type") == "macro"]
+    if not macro_entries:
+        return
+
+    table = Table(
+        title="Macro Cycle Details",
+        box=box.SIMPLE_HEAD,
+        show_lines=True,
+    )
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Reflections", style="green", width=12)
+    table.add_column("Beliefs Changed", style="yellow", width=15)
+    table.add_column("Goals Active", width=12)
+    table.add_column("Abandoned", style="red", width=10)
+    table.add_column("Compacted", style="dim", width=12)
+    table.add_column("Unmet Drives", overflow="fold")
+
+    for i, entry in enumerate(macro_entries, 1):
+        review = entry.get("_macro_goal_review", {})
+        compaction = entry.get("_macro_compaction", {})
+        unmet = entry.get("_macro_unmet_drives", [])
+        accepted = entry.get("_macro_accepted_reflections", [])
+        archival = entry.get("_macro_archival_candidates", [])
+
+        compacted_str = "—"
+        if compaction and not compaction.get("skipped"):
+            compacted_str = f"C:{compaction.get('cooled', 0)} A:{compaction.get('archived', 0)}"
+
+        table.add_row(
+            str(i),
+            str(len(accepted)),
+            str(len(archival)) + " decayed" if archival else "0",
+            str(review.get("active_goal_count", "?")),
+            str(len(review.get("abandoned_goal_ids", []))),
+            compacted_str,
+            ", ".join(f"{d['drive']}={d['value']}" for d in unmet) if unmet else "—",
+        )
+
+    console.print(table)
+
 
 def main() -> None:
     if len(sys.argv) < 2:

@@ -7,8 +7,7 @@ Reference: cognitive_loop.md §3.1 step 6 (UPDATE_GOALS)
 """
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
+
 from typing import Any, Dict, List, Optional
 
 from ...schema.state import GoalRecord
@@ -94,8 +93,10 @@ class GoalSystem:
             if drive in existing_drives:
                 return None
 
-        goal_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        # Deterministic ID — replay-safe (no uuid4)
+        source_desire_id = str(proposal.get("source_desire_id", "unknown"))
+        goal_id = f"goal-{drive or 'none'}-{source_desire_id}"
+        crystallized_at = str(proposal.get("crystallized_at", ""))
         return GoalRecord(
             id=goal_id,
             label=str(proposal.get("label", "Unnamed goal")),
@@ -106,6 +107,6 @@ class GoalSystem:
             frustration=0.0,
             status="active",
             crystallized_from_drive=drive or None,
-            crystallized_at=str(proposal.get("crystallized_at", now)),
-            created_at=now,
+            crystallized_at=crystallized_at or None,
+            created_at=crystallized_at or None,
         )
