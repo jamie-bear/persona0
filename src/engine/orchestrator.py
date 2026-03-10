@@ -11,6 +11,7 @@ CP-1 exit gate: rollback leaves no persistent write residue
 """
 from __future__ import annotations
 
+import copy
 import time
 import uuid
 from datetime import datetime, timezone
@@ -183,7 +184,7 @@ class EgoOrchestrator:
 
         except (PolicyViolation, MutabilityViolation) as exc:
             # Full rollback
-            self.state = snapshot
+            self._restore_state_in_place(snapshot)
 
             duration_ms = int((time.monotonic() - start_ts) * 1000)
             rollback_reason = str(exc)
@@ -213,6 +214,12 @@ class EgoOrchestrator:
                 rollback_reason=rollback_reason,
                 duration_ms=duration_ms,
             )
+
+    def _restore_state_in_place(self, snapshot: AgentState) -> None:
+        """Restore current state values from snapshot while preserving object identity."""
+        for field_name in AgentState.model_fields:
+            restored_value = copy.deepcopy(getattr(snapshot, field_name))
+            setattr(self.state, field_name, restored_value)
 
     @staticmethod
     def _build_log_entry(

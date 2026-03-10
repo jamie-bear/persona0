@@ -87,6 +87,28 @@ def test_rollback_leaves_no_state_residue(tmp_path):
     )
 
 
+
+
+def test_rollback_restores_existing_state_object_in_place(tmp_path):
+    """Rollback must preserve state object identity for external references."""
+    orch, _, _ = _make_orchestrator(tmp_path)
+    external_state_ref = orch.state
+
+    baseline = external_state_ref.model_dump()
+
+    def mutating_then_failing_step(state, event, pending_writes):
+        state.affect.valence = 0.77
+        state.tick_counter = 123
+        raise PolicyViolation("forced rollback")
+
+    orch.register_step("world_ingest", mutating_then_failing_step)
+
+    result = orch.run_cycle(CycleType.FAST_TICK)
+
+    assert not result.success
+    assert orch.state is external_state_ref
+    assert orch.state.model_dump() == baseline
+    assert external_state_ref.model_dump() == baseline
 def test_const_write_triggers_rollback(tmp_path):
     """Attempted write to CONST field via validate_const_fields_unchanged must rollback."""
     orch, _, _ = _make_orchestrator(tmp_path)
