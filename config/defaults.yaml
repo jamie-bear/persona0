@@ -192,3 +192,21 @@ observability:
 
   # State snapshot granularity
   emit_full_state_snapshot: false    # true emits full state per cycle (verbose); false emits deltas only
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM ADAPTER
+# ─────────────────────────────────────────────────────────────────────────────
+llm_adapter:
+  # Toggle external adapter calls for interaction rendering and fast-tick appraisal
+  enabled: false
+
+  # Provider/model selection used by src/engine/adapters/llm.py
+  provider: mock
+  model: mock-chat-v1
+
+  # Request behavior controls
+  timeout_seconds: 2
+  retries: 1
+
+  # Explicit dev/test fallback switch for deterministic offline runs
+  deterministic_mode: true

@@ -8,6 +8,8 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState
+from ..adapters import llm as llm_adapter
+from ..modules._config import load_config_section
 from ..retrieval import load_retrieval_limits, rank_memory_candidates
 
 
@@ -78,7 +80,31 @@ def render_response(state: AgentState, event: Dict[str, Any], pending_writes: Li
         # LLM adapter already populated the response; nothing to do.
         return
 
-    # Deterministic stub — persona name + turn context, no randomness.
+    cfg = load_config_section("llm_adapter")
+    use_adapter = bool(cfg.get("enabled", False))
+    deterministic_mode = bool(cfg.get("deterministic_mode", False))
+
+    if use_adapter:
+        try:
+            event["candidate_response"] = llm_adapter.generate_response(
+                event.get("context_package", {}),
+                state,
+            )
+            return
+        except Exception as exc:
+            event["_response_adapter_error"] = str(exc)
+            if not deterministic_mode:
+                raise
+
+    if deterministic_mode:
+        event["candidate_response"] = _deterministic_fallback_response(state, event)
+        return
+
+    raise RuntimeError("No response available: adapter disabled and deterministic_mode is off")
+
+
+def _deterministic_fallback_response(state: AgentState, event: Dict[str, Any]) -> str:
+    """Deterministic response fallback used explicitly in dev/test mode."""
     persona_name = str(state.persona.name) if state.persona else "Assistant"
     ctx = event.get("context_package", {})
     memory_count = len(ctx.get("selected_memories", []))
@@ -88,7 +114,7 @@ def render_response(state: AgentState, event: Dict[str, Any], pending_writes: Li
         None,
     )
     goal_note = f" (pursuing: {dominant_goal})" if dominant_goal else ""
-    event["candidate_response"] = (
+    return (
         f"[{persona_name}{goal_note}] Responding to: {user_turn!r} "
         f"with {memory_count} memories in context."
     )
