@@ -8,3 +8,6 @@ build/
 .env
 *.db
 *.jsonl
+.coverage
+htmlcov/
+.pytest_cache/
