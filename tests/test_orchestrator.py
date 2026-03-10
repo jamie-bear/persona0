@@ -185,3 +185,14 @@ def test_all_cycle_types_run(tmp_path, cycle_type):
     orch, _, _ = _make_orchestrator(tmp_path)
     result = orch.run_cycle(cycle_type)
     assert result.success
+
+
+def test_cycle_log_includes_policy_check_summary(tmp_path):
+    """Cycle logs should preserve structured policy check summaries when present."""
+    orch, logger, _ = _make_orchestrator(tmp_path)
+
+    event = {"_policy_check_result": {"blocked": 0, "warnings": 1, "block_categories": []}}
+    orch.run_cycle(CycleType.INTERACTION, event)
+
+    entries = logger.read_all()
+    assert entries[0].policy_check_result == event["_policy_check_result"]

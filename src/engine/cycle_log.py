@@ -68,6 +68,7 @@ class CycleLogEntry:
     desires_generated: int = 0
     desires_crystallized: int = 0
     write_count: int = 0
+    policy_check_result: Optional[Dict[str, Any]] = None
     rollback: bool = False
     rollback_reason: Optional[str] = None
     duration_ms: int = 0

@@ -36,6 +36,7 @@ from .contracts import (
     ARCHIVE_REFLECTION,
     GOAL_REVIEW,
     DRIVE_REVIEW,
+    COMPACT_EPISODIC_MEMORY,
     RETRIEVE_MEMORY_CANDIDATES,
     ROUTINE_EVENT,
     SALIENCE_COMPETITION,
@@ -109,7 +110,7 @@ def register_default_steps(
     else:
         orchestrator.register_step(ROUTINE_EVENT, slow_tick.routine_event)
 
-    # ── Macro cycle (CP-4 stubs) ───────────────────────────────────────────────
+    # ── Macro cycle ──────────────────────────────────────────────────────────────
     orchestrator.register_step(SELECT_HIGH_SIGNAL_EPISODES, macro.select_high_signal_episodes)
     orchestrator.register_step(CLUSTER_EPISODES, macro.cluster_episodes)
     orchestrator.register_step(PRODUCE_CANDIDATE_REFLECTIONS, macro.produce_candidate_reflections)
@@ -119,5 +120,13 @@ def register_default_steps(
     orchestrator.register_step(ARCHIVE_REFLECTION, macro.archive_reflection)
     orchestrator.register_step(GOAL_REVIEW, macro.goal_review)
     orchestrator.register_step(DRIVE_REVIEW, macro.drive_review)
+
+    if store is not None:
+        def _compact_episodic_memory_with_store(state, event, pending_writes):
+            event.setdefault("_store", store)
+            macro.compact_episodic_memory(state, event, pending_writes)
+        orchestrator.register_step(COMPACT_EPISODIC_MEMORY, _compact_episodic_memory_with_store)
+    else:
+        orchestrator.register_step(COMPACT_EPISODIC_MEMORY, macro.compact_episodic_memory)
 
     return orchestrator

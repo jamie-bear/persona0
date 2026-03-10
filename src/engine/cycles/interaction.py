@@ -67,7 +67,31 @@ def build_context_package(
 
 
 def render_response(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """G. render_response — LLM renders candidate text; no writes to persistent state."""
+    """G. render_response — build candidate text for policy checks.
+
+    Supports two deterministic paths:
+    1) If ``event['_render_fn']`` is callable, it is invoked with
+       ``(state, context_package, event)`` and should return text.
+    2) Otherwise a deterministic local fallback template is used.
+
+    This step intentionally performs no persistent writes.
+    """
+    context = event.get("context_package", {})
+    render_fn = event.get("_render_fn")
+
+    if callable(render_fn):
+        candidate = str(render_fn(state, context, event))
+    else:
+        user_turn = str(context.get("user_turn", "")).strip()
+        selected_ids = list(context.get("selected_memory_ids", []))
+        memory_hint = ", ".join(selected_ids[:3]) if selected_ids else "no-prior-memory"
+        candidate = (
+            f"I hear you: {user_turn}. "
+            f"I considered memories: {memory_hint}. "
+            "I will respond consistently with my persona values."
+        ).strip()
+
+    event["candidate_response"] = candidate
 
 
 def policy_and_consistency_check(
@@ -109,7 +133,15 @@ def policy_and_consistency_check(
         for outcome in value_result.outcomes:
             combined.add(outcome)
 
-    event["_policy_check_result"] = combined.summary()
+    summary = combined.summary()
+    event["_policy_check_result"] = summary
+
+    if not combined.passed:
+        from ..orchestrator import PolicyViolation
+        blocked = summary.get("block_categories", [])
+        raise PolicyViolation(
+            "Policy check failed: " + ", ".join(blocked or ["unknown"])
+        )
 
 
 def commit_or_rollback(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

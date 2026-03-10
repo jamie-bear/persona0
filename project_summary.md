@@ -165,9 +165,9 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-4 are comp
 
 ### CP-5 — Governance (remaining items)
 
-- **Macro-cycle compaction wiring:** call `cool_records()` and `archive_cooled()` from a macro step so memory lifecycle management runs automatically each nightly cycle
-- **Audit log ergonomics:** flesh out `src/cli/trace_viewer.py` to render cycle logs and policy outcomes in human-readable form
-- **Interaction cycle render stub:** `render_response` remains LLM-dependent; the hard-limit and value checks in `policy_and_consistency_check` operate on real candidate text once wired to an LLM
+- ~~**Macro-cycle compaction wiring:** call `cool_records()` and `archive_cooled()` from a macro step so memory lifecycle management runs automatically each nightly cycle~~ ✅ **Implemented** via `compact_episodic_memory` macro step and default setup wiring.
+- ~~**Audit log ergonomics:** flesh out `src/cli/trace_viewer.py` to render cycle logs and policy outcomes in human-readable form~~ ✅ **Implemented** with policy summary column and blocked/warning category display.
+- ~~**Interaction cycle render stub:** `render_response` remains LLM-dependent; the hard-limit and value checks in `policy_and_consistency_check` operate on real candidate text once wired to an LLM~~ ✅ **Partially implemented** with deterministic fallback candidate generation and optional injected render hook for integration.
 
 ### CP-6 — Evaluation sprint
 

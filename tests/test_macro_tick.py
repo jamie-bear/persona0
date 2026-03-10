@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.engine.cycles.macro import (
     archive_reflection,
     cluster_episodes,
+    compact_episodic_memory,
     decay_unreinforced_beliefs,
     drive_review,
     goal_review,
@@ -12,6 +13,7 @@ from src.engine.cycles.macro import (
     update_self_beliefs,
 )
 from src.schema.state import AgentState, GoalRecord, SelfBelief
+from src.store.episodic_store import EpisodicStore
 
 
 def _episode(
@@ -377,3 +379,44 @@ def test_macro_pipeline_determinism() -> None:
         })
 
     assert results[0] == results[1]
+
+
+def test_compact_episodic_memory_no_store_is_noop() -> None:
+    state = AgentState()
+    event: dict = {}
+
+    compact_episodic_memory(state, event, [])
+
+    assert event["_macro_memory_compaction"]["enabled"] is False
+
+
+def test_compact_episodic_memory_runs_cool_and_archive() -> None:
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+
+    with TemporaryDirectory() as tmp:
+        store = EpisodicStore(Path(tmp) / "macro.db")
+        from src.schema.records import EpisodicEvent, RecordMeta
+
+        record = EpisodicEvent(
+            meta=RecordMeta(
+                id="e1",
+                created_at="2026-01-01T00:00:00Z",
+                source_type="synthetic",
+                lifecycle_state="active",
+            ),
+            when="2026-01-01T00:00:00Z",
+            event_text="event e1",
+            importance=0.05,
+        )
+        store.append(record, "c1", "Orchestrator")
+        store.update_decay_factor("e1", 0.05)
+
+        event = {"_store": store}
+        compact_episodic_memory(AgentState(), event, [])
+
+        summary = event["_macro_memory_compaction"]
+        assert summary["enabled"] is True
+        assert "e1" in summary["cooled_ids"]
+        assert "e1" in summary["archived_ids"]
+        assert store.count("archived") == 1
