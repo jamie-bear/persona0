@@ -1,0 +1,7 @@
+governance:
+  enforcement_mode: audit
+llm_adapter:
+  enabled: false
+  deterministic_mode: true
+observability:
+  emit_full_state_snapshot: true

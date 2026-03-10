@@ -11,3 +11,10 @@ This repo includes checkpoint-aligned evaluation helpers in `src/eval/` and pyte
 - Retrieval evaluation checks Precision@5 and top-5 self-relevant memory presence (CP-2).
 - Self-belief safety evaluation checks confidence delta cap (`+0.15`) and contradiction rejection against core values/founding traits (CP-4).
 - Threshold documentation is in `tests/eval/README.md`.
+
+## Deployment and Operations
+
+- Container build/runtime: `Dockerfile`
+- Kubernetes manifests: `deploy/kubernetes/`
+- Environment overlays: `config/environments/{dev,staging,prod}.yaml`
+- Runbook: `docs/operations.md`
