@@ -113,18 +113,18 @@ Closed all v0.1 gaps:
 
 ## Current Status
 
-Persona0 is in an **active implementation phase** — CP-0 through CP-4 are complete and CP-5 governance hardening is underway. All four cognitive cycle types (interaction, fast, slow, macro) have behavior-complete step implementations with full test coverage.
+Persona0 is in an **active implementation phase** — CP-0 through CP-4 are complete, and CP-5 governance hardening is well underway. All four cognitive cycle types (interaction, fast, slow, macro) have behavior-complete step implementations with full test coverage.
 
 - **CP-0 (done):** Schema and contracts — `AgentState`, mutability registry, single-writer ownership enforcement, deterministic cycle ordering contracts.
 - **CP-1 (done):** Transaction-safe orchestrator, SHA-256 state hashing, cycle logging, append-only SQLite episodic store, replay determinism harness, interaction retrieval/salience/context pipeline.
 - **CP-2 (done):** Hybrid memory retrieval scorer with `why_selected` explainability, interaction cycle steps C/D/F (retrieve → salience → context), `FoundingTraitSeed` constitution bootstrap, evaluation harness (`evaluate_retrieval_precision`, `evaluate_self_belief_safety`).
 - **CP-3 (done):** Affect + drive dynamics + desire generation — all fast-tick and slow-tick steps are behavior-complete. All CP-3 exit gates verified (see below).
-- **CP-4 (done):** Nightly macro-cycle with confidence decay (`decay_unreinforced_beliefs`), recency window filtering, goal lifecycle management (staleness/abandonment/suspension), `max_new_statements_per_cycle` enforcement, nightly ephemeral clearing, and macro determinism replay verification.
-- **CP-5 (in progress):** Governance hardening — `PolicyOutcome` objects for machine-auditable interaction checks, episodic store lifecycle management (active→cooling→archived→deleted transitions, user-initiated `forget`), PII redaction hooks before long-term commit.
+- **CP-4 (done):** Complete nightly macro-cycle — episode selection with recency window filter (72h default), deterministic clustering, evidence scoring, `update_self_beliefs` with `max_new_statements_per_cycle` cap (3), `decay_unreinforced_beliefs` step applying −0.02/cycle after 14 days of no reinforcement (CONST_SEED beliefs exempt), goal lifecycle management (staleness abandonment after 30 days, frustration-based suspension at ≥0.75), nightly clearing of `persisted_desires` and `consecutive_thought_categories`, and macro determinism replay verification.
+- **CP-5 (in progress):** Governance hardening — `PolicyOutcome`/`PolicyCheckResult` for machine-auditable checks (categories: `CONST_VIOLATION`, `OWNERSHIP_VIOLATION`, `HARD_LIMIT_BREACH`, `VALUE_CONTRADICTION`, `WRITE_CAP_EXCEEDED`, `PII_DETECTED`), `policy_and_consistency_check` wired in interaction cycle, episodic store lifecycle management (`transition_lifecycle`, `cool_records`, `archive_cooled`, `forget`, `forget_bulk`), PII redaction hooks (email, phone, SSN, CC, IPv4) applied before every long-term store commit.
 
 **161 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, `test_macro_tick`, and `test_governance`.
 
-### CP-3 Modules Implemented
+### Modules Implemented
 
 | Module | File | Role |
 |---|---|---|
@@ -132,8 +132,13 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-4 are comp
 | `DriveModule` | `src/engine/modules/drive.py` | Homeostatic growth, activity-event satisfaction, desire generation, crystallization, desire aging/expiry |
 | `ThoughtGenerator` | `src/engine/modules/thought.py` | Deterministic category selection (desire → affect → drive priority), 3-consecutive guardrail, template-based text |
 | `GoalSystem` | `src/engine/modules/goal.py` | Per-tick progress/frustration ticking, suspension threshold, crystallization proposal acceptance |
-| Config loader | `src/engine/modules/_config.py` | Cached YAML section loader shared by all modules |
-| Step factory | `src/engine/default_setup.py` | `register_default_steps()` — wires all cycle steps onto an `EgoOrchestrator` |
+| `EpisodicStore` | `src/store/episodic_store.py` | SQLite append-only store with full lifecycle: active→cooling→archived→deleted, `forget`/`forget_bulk` |
+| `governance` | `src/engine/governance.py` | `PolicyOutcome`/`PolicyCheckResult` — machine-auditable write, hard-limit, and value-consistency checks |
+| `pii_redaction` | `src/engine/pii_redaction.py` | Pattern-based PII redaction (email, phone, SSN, CC, IPv4) applied before every long-term store commit |
+| `_store_helpers` | `src/engine/cycles/_store_helpers.py` | Shared EpisodicEvent construction + PII redaction used by fast_tick and slow_tick |
+| `macro` cycle | `src/engine/cycles/macro.py` | 9-step nightly reflection: episode selection, clustering, evidence scoring, belief update+decay, goal lifecycle, drive review, nightly clearing |
+| Config loader | `src/engine/modules/_config.py` | Cached YAML section loader (includes `load_reflection_config`, `load_goals_config`, etc.) |
+| Step factory | `src/engine/default_setup.py` | `register_default_steps()` — wires all cycle steps including `decay_unreinforced_beliefs` onto an `EgoOrchestrator` |
 
 ### CP-3 Exit Gates (all verified)
 
@@ -152,12 +157,21 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-4 are comp
 | **CP-1** | **Done** | Transaction-safe orchestrator, cycle logging/hash deltas, append-only episodic store, interaction retrieval/salience/context packaging, replay determinism | `src/engine/orchestrator.py`, `src/engine/cycle_log.py`, `src/store/episodic_store.py`, `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `tests/test_orchestrator.py`, `tests/replay/test_determinism.py`, `tests/test_retrieval_and_interaction.py` |
 | **CP-2** | **Done** | Hybrid retrieval scorer with explainability, interaction steps C/D/F, constitution belief bootstrap, evaluation metrics | `src/engine/retrieval.py`, `src/engine/cycles/interaction.py`, `src/schema/state.py`, `src/eval/metrics.py`, `tests/eval/test_metrics.py`, `tests/test_retrieval_and_interaction.py` |
 | **CP-3** | **Done** | Affect + drive dynamics, desire generation/crystallization, fast-tick and slow-tick pipelines behavior-complete | `src/engine/modules/`, `src/engine/cycles/fast_tick.py`, `src/engine/cycles/slow_tick.py`, `src/engine/default_setup.py`, `tests/test_fast_tick.py`, `tests/test_slow_tick.py` |
-| **CP-4** | **In progress** | Deterministic macro-cycle scaffold implemented; next is behavior hardening, richer evidence quality controls, and persistence/audit integration | `src/engine/cycles/macro.py`, `src/engine/default_setup.py`, `tests/test_macro_tick.py`, `tests/test_default_setup.py` |
-| **CP-5** | **Not started** | Governance/policy hardening and user lifecycle operations (forget/delete, redaction lifecycle) | `src/engine/cycles/interaction.py`, `src/store`, `src/cli/trace_viewer.py` |
-| **CP-6** | **Not started** | Evaluation harness, benchmarks, and operational readiness hardening | `tests/`, `src/cli`, `config/defaults.yaml` |
+| **CP-4** | **Done** | Full macro-cycle: episode selection + recency filter, evidence scoring, belief update with new-statement cap, confidence decay for unreinforced beliefs, goal lifecycle (staleness/abandonment/suspension), nightly ephemeral clearing, determinism replay test | `src/engine/cycles/macro.py`, `src/engine/contracts.py`, `src/engine/default_setup.py`, `tests/test_macro_tick.py`, `tests/test_default_setup.py` |
+| **CP-5** | **In progress** | `PolicyOutcome` governance objects, interaction `policy_and_consistency_check` wired, episodic store lifecycle transitions, user-initiated `forget`/`forget_bulk`, PII redaction before long-term commit | `src/engine/governance.py`, `src/engine/pii_redaction.py`, `src/engine/cycles/_store_helpers.py`, `src/engine/cycles/interaction.py`, `src/store/episodic_store.py`, `tests/test_governance.py` |
+| **CP-6** | **Not started** | Evaluation harness, MCS/ISS/ECI metrics, operational readiness — P95 latency, multi-day replay, drift alerts | `tests/`, `src/cli/`, `src/eval/`, `config/defaults.yaml` |
 
-## Roadmap Focus (Post CP-4 Scaffold)
+## Remaining Work
 
-1. **CP-4 — Macro cycle hardening:** refine nightly reflection quality (better clustering/evidence heuristics), persist macro outputs through governed write paths, and expand replay-oriented determinism tests.
-2. **CP-5 — Governance hardening:** policy validation on response emission, forget/delete lifecycle, PII redaction, audit ergonomics.
-3. **CP-6 — Evaluation sprint:** extend replay/continuity benchmarks, MCS/ISS/ECI metrics, and operational readiness checks that include macro-cycle continuity behavior.
+### CP-5 — Governance (remaining items)
+
+- **Macro-cycle compaction wiring:** call `cool_records()` and `archive_cooled()` from a macro step so memory lifecycle management runs automatically each nightly cycle
+- **Audit log ergonomics:** flesh out `src/cli/trace_viewer.py` to render cycle logs and policy outcomes in human-readable form
+- **Interaction cycle render stub:** `render_response` remains LLM-dependent; the hard-limit and value checks in `policy_and_consistency_check` operate on real candidate text once wired to an LLM
+
+### CP-6 — Evaluation sprint
+
+- Implement MCS (Memory Coherence Score), ISS (Identity Stability Score), ECI (Emotional Consistency Index) from cycle log data
+- Extend replay harness to multi-day simulation (macro cycle included)
+- Add longitudinal drift alerts (ISS/ECI delta thresholds across replay runs)
+- Operational readiness: P95 context-build latency target < 250 ms (excluding LLM)
