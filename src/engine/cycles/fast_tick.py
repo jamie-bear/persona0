@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState
+from ._store_helpers import try_store_append
 from ..modules.emotion import EmotionModule
 from ..modules.drive import DriveModule
 from ..modules.thought import ThoughtGenerator
@@ -141,47 +142,10 @@ def write_memory(state: AgentState, event: Dict[str, Any], pending_writes: List)
 
     store = event.get("_store")
     if store is not None:
-        _try_store_append(store, record, state, event)
+        try_store_append(store, record, state, event)
 
     event.setdefault("_pending_episodic", []).append(record)
     pending_writes.append({"field_path": "episodic_log", "author_module": "Orchestrator"})
-
-
-def _try_store_append(store: Any, record: Dict, state: AgentState, event: Dict) -> None:
-    """Attempt to append record to an EpisodicStore; silently skip on failure."""
-    try:
-        from ...store.episodic_store import EpisodicStore
-        from ...schema.records import EpisodicEvent, RecordMeta, AffectSnapshot, DriveSnapshot
-        if not isinstance(store, EpisodicStore):
-            return
-        meta = RecordMeta(
-            id=record["id"],
-            created_at=record["created_at"],
-            source_type="synthetic",
-            source_ref=f"tick:{state.tick_counter}",
-            mutability_class="SELF",
-            lifecycle_state="active",
-        )
-        ep = EpisodicEvent(
-            meta=meta,
-            when=record["created_at"],
-            event_text=record["event_text"],
-            importance=record["importance"],
-            affect_snapshot=AffectSnapshot(
-                valence=state.affect.valence,
-                arousal=state.affect.arousal,
-                stress=state.affect.stress,
-            ),
-            drive_snapshot=DriveSnapshot(
-                social_need=state.drives.social_need,
-                mastery_need=state.drives.mastery_need,
-                rest_need=state.drives.rest_need,
-                curiosity=state.drives.curiosity,
-            ),
-        )
-        store.append(ep, cycle_id=event.get("_cycle_id", ""), author_module="Orchestrator")
-    except Exception:
-        pass
 
 
 def log_cycle(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

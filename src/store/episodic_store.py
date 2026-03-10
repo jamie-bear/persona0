@@ -1,8 +1,10 @@
 """
-Append-only episodic event store backed by SQLite.
+Episodic event store backed by SQLite.
 
 Reference: self_editability_policy.md §3.2 (memory stores: append-only)
-CP-1 requirement: records are never modified or deleted (in Phase 1)
+CP-1: records are never modified or deleted (except decay_factor)
+CP-5: lifecycle transitions (active → cooling → archived → deleted) and
+      user-initiated forget/delete operations added.
 """
 from __future__ import annotations
 
@@ -33,12 +35,22 @@ CREATE INDEX IF NOT EXISTS idx_importance ON episodic_log(importance);
 """
 
 
+_VALID_LIFECYCLE_STATES = {"active", "cooling", "archived", "deleted"}
+_VALID_TRANSITIONS = {
+    "active": {"cooling", "deleted"},
+    "cooling": {"archived", "active", "deleted"},
+    "archived": {"deleted"},
+    "deleted": set(),  # terminal state
+}
+
+
 class EpisodicStore:
-    """SQLite-backed append-only episodic event store.
+    """SQLite-backed episodic event store with lifecycle management.
 
     Invariants:
-    - Records are never modified after insertion (except decay_factor)
-    - No DELETE statements except via user forget API (not implemented in Phase 1)
+    - Records are never modified after insertion (except decay_factor and lifecycle_state)
+    - lifecycle_state transitions follow: active → cooling → archived → deleted
+    - Deleted records are soft-deleted (lifecycle_state = 'deleted'), not removed from DB
     - All writes carry author_module and cycle_id for provenance
     """
 
@@ -93,6 +105,129 @@ class EpisodicStore:
             (new_decay_factor, record_id),
         )
         self._conn.commit()
+
+    # ── Lifecycle ──────────────────────────────────────────────────────────────
+
+    def transition_lifecycle(
+        self, record_id: str, new_state: str
+    ) -> bool:
+        """Transition a record's lifecycle state.
+
+        Valid transitions: active→cooling, cooling→archived, any→deleted.
+        Returns True if the transition was applied, False if the record was
+        not found or the transition is invalid.
+
+        Raises ValueError for invalid target states.
+        """
+        if new_state not in _VALID_LIFECYCLE_STATES:
+            raise ValueError(f"Invalid lifecycle state: '{new_state}'")
+
+        row = self._conn.execute(
+            "SELECT lifecycle_state FROM episodic_log WHERE id = ?",
+            (record_id,),
+        ).fetchone()
+        if row is None:
+            return False
+
+        current = row["lifecycle_state"]
+        if new_state not in _VALID_TRANSITIONS.get(current, set()):
+            return False
+
+        self._conn.execute(
+            "UPDATE episodic_log SET lifecycle_state = ? WHERE id = ?",
+            (new_state, record_id),
+        )
+        self._conn.commit()
+        return True
+
+    def cool_records(
+        self,
+        max_records: int = 100,
+        importance_threshold: float = 0.15,
+        decay_threshold: float = 0.10,
+    ) -> List[str]:
+        """Move low-importance, low-decay active records to 'cooling' state.
+
+        Returns list of record IDs that were transitioned.
+        Reference: config/defaults.yaml memory.decay_cooling_threshold,
+                   memory.importance_cooling_threshold
+        """
+        rows = self._conn.execute(
+            """
+            SELECT id FROM episodic_log
+            WHERE lifecycle_state = 'active'
+              AND importance < ?
+              AND decay_factor < ?
+            ORDER BY created_at ASC
+            LIMIT ?
+            """,
+            (importance_threshold, decay_threshold, max_records),
+        ).fetchall()
+
+        cooled = []
+        for row in rows:
+            rid = row["id"]
+            if self.transition_lifecycle(rid, "cooling"):
+                cooled.append(rid)
+        return cooled
+
+    def archive_cooled(self, max_records: int = 50) -> List[str]:
+        """Move cooling records to 'archived' state.
+
+        Returns list of record IDs that were transitioned.
+        Reference: config/defaults.yaml memory.max_records_archived_per_cycle
+        """
+        rows = self._conn.execute(
+            """
+            SELECT id FROM episodic_log
+            WHERE lifecycle_state = 'cooling'
+            ORDER BY created_at ASC
+            LIMIT ?
+            """,
+            (max_records,),
+        ).fetchall()
+
+        archived = []
+        for row in rows:
+            rid = row["id"]
+            if self.transition_lifecycle(rid, "archived"):
+                archived.append(rid)
+        return archived
+
+    def forget(self, record_id: str) -> bool:
+        """User-initiated forget: transition any non-deleted record to 'deleted'.
+
+        This is a soft-delete; the record remains in the DB but is excluded
+        from all queries. Returns True if successful.
+
+        Reference: ego_data.md §6 (user deletion rights)
+        """
+        row = self._conn.execute(
+            "SELECT lifecycle_state FROM episodic_log WHERE id = ?",
+            (record_id,),
+        ).fetchone()
+        if row is None:
+            return False
+
+        current = row["lifecycle_state"]
+        if current == "deleted":
+            return False
+
+        # User forget bypasses normal transition rules — any state → deleted
+        self._conn.execute(
+            "UPDATE episodic_log SET lifecycle_state = 'deleted' WHERE id = ?",
+            (record_id,),
+        )
+        self._conn.commit()
+        return True
+
+    def forget_bulk(self, record_ids: List[str]) -> int:
+        """Forget multiple records at once. Returns count of records deleted."""
+        count = 0
+        for rid in record_ids:
+            if self.forget(rid):
+                count += 1
+        return count
 
     # ── Query ─────────────────────────────────────────────────────────────────
 

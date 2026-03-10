@@ -113,15 +113,16 @@ Closed all v0.1 gaps:
 
 ## Current Status
 
-Persona0 is in an **active implementation phase** — CP-0 through CP-3 are complete, and CP-4 has started with deterministic nightly macro-cycle scaffolding in place. Fast/slow pipelines are behavior-complete, and macro-cycle steps are now wired, testable, and ready for iterative hardening.
+Persona0 is in an **active implementation phase** — CP-0 through CP-4 are complete and CP-5 governance hardening is underway. All four cognitive cycle types (interaction, fast, slow, macro) have behavior-complete step implementations with full test coverage.
 
 - **CP-0 (done):** Schema and contracts — `AgentState`, mutability registry, single-writer ownership enforcement, deterministic cycle ordering contracts.
 - **CP-1 (done):** Transaction-safe orchestrator, SHA-256 state hashing, cycle logging, append-only SQLite episodic store, replay determinism harness, interaction retrieval/salience/context pipeline.
 - **CP-2 (done):** Hybrid memory retrieval scorer with `why_selected` explainability, interaction cycle steps C/D/F (retrieve → salience → context), `FoundingTraitSeed` constitution bootstrap, evaluation harness (`evaluate_retrieval_precision`, `evaluate_self_belief_safety`).
 - **CP-3 (done):** Affect + drive dynamics + desire generation — all fast-tick and slow-tick steps are behavior-complete. All CP-3 exit gates verified (see below).
-- **CP-4 (in progress):** Deterministic nightly macro-cycle scaffolding implemented (`select_high_signal_episodes`, `cluster_episodes`, `produce_candidate_reflections`, `score_evidence_sufficiency`, `update_self_beliefs`, `archive_reflection`, `goal_review`, `drive_review`) with explicit default-step registration and focused unit coverage.
+- **CP-4 (done):** Nightly macro-cycle with confidence decay (`decay_unreinforced_beliefs`), recency window filtering, goal lifecycle management (staleness/abandonment/suspension), `max_new_statements_per_cycle` enforcement, nightly ephemeral clearing, and macro determinism replay verification.
+- **CP-5 (in progress):** Governance hardening — `PolicyOutcome` objects for machine-auditable interaction checks, episodic store lifecycle management (active→cooling→archived→deleted transitions, user-initiated `forget`), PII redaction hooks before long-term commit.
 
-**128 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, and `test_macro_tick`.
+**161 tests passing** across `test_schema`, `test_contracts`, `test_orchestrator`, `tests/replay`, `tests/eval`, `test_retrieval_and_interaction`, `test_fast_tick`, `test_slow_tick`, `test_default_setup`, `test_macro_tick`, and `test_governance`.
 
 ### CP-3 Modules Implemented
 

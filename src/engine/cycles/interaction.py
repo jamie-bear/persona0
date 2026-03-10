@@ -73,7 +73,43 @@ def render_response(state: AgentState, event: Dict[str, Any], pending_writes: Li
 def policy_and_consistency_check(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
-    """H. policy_and_consistency_check — validate candidate response and pending writes."""
+    """H. policy_and_consistency_check — validate candidate response and pending writes.
+
+    Produces structured PolicyOutcome objects for auditability (CP-5).
+    Results are stored in event['_policy_check_result'] for the cycle log.
+    """
+    from ..governance import (
+        PolicyCheckResult,
+        check_hard_limits,
+        check_proposed_writes,
+        check_value_consistency,
+    )
+    from ...schema.mutability import DEFAULT_REGISTRY
+    from ..modules._config import load_config_section
+
+    gov_cfg = load_config_section("governance")
+    max_writes = int(gov_cfg.get("max_writes_per_transaction", 50))
+
+    combined = PolicyCheckResult()
+
+    # 1. Validate proposed writes against ownership registry
+    write_result = check_proposed_writes(pending_writes, DEFAULT_REGISTRY, max_writes)
+    for outcome in write_result.outcomes:
+        combined.add(outcome)
+
+    # 2. Check candidate response against hard limits
+    candidate_text = str(event.get("candidate_response", ""))
+    if candidate_text:
+        limit_result = check_hard_limits(state, candidate_text)
+        for outcome in limit_result.outcomes:
+            combined.add(outcome)
+
+        # 3. Check value consistency
+        value_result = check_value_consistency(state, candidate_text)
+        for outcome in value_result.outcomes:
+            combined.add(outcome)
+
+    event["_policy_check_result"] = combined.summary()
 
 
 def commit_or_rollback(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
