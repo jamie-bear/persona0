@@ -8,12 +8,10 @@ Reference: cognitive_loop.md §3.2
 """
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState
-from ._store_helpers import try_store_append
+from ._store_helpers import deterministic_record_metadata, next_record_sequence_index, try_store_append
 from ..modules.drive import DriveModule
 from ..modules.goal import GoalSystem
 
@@ -69,11 +67,16 @@ def routine_event(state: AgentState, event: Dict[str, Any], pending_writes: List
     """
     activity = event.get("_new_activity", state.activity.current_activity)
     text = _ROUTINE_TEMPLATES.get(activity, f"Engaged in {activity}.")
-    now = datetime.now(timezone.utc).isoformat()
-    record_id = str(uuid.uuid4())
+    metadata = deterministic_record_metadata(
+        state,
+        event,
+        cycle_type="slow_tick",
+        record_type="routine_event",
+        sequence_index=next_record_sequence_index(event),
+    )
     record = {
-        "id": record_id,
-        "created_at": now,
+        "id": metadata["id"],
+        "created_at": metadata["created_at"],
         "cycle_id": event.get("_cycle_id", ""),
         "author_module": "Orchestrator",
         "event_text": text,

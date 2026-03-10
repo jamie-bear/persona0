@@ -5,10 +5,71 @@ to eliminate duplication.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
+from uuid import NAMESPACE_URL, uuid5
 
 from ...schema.state import AgentState
 from ..pii_redaction import redact_pii
+
+
+_CYCLE_ORDER = {
+    "interaction": 0,
+    "fast_tick": 1,
+    "slow_tick": 2,
+    "macro": 3,
+}
+
+
+def next_record_sequence_index(event: Dict[str, Any]) -> int:
+    """Return the next per-cycle sequence index for episodic record construction."""
+    idx = int(event.get("_record_sequence_index", 0))
+    event["_record_sequence_index"] = idx + 1
+    return idx
+
+
+def deterministic_record_metadata(
+    state: AgentState,
+    event: Dict[str, Any],
+    *,
+    cycle_type: str,
+    record_type: str,
+    sequence_index: int,
+) -> Dict[str, str]:
+    """Build deterministic ``id`` + ``created_at`` fields for episodic records.
+
+    ``created_at`` prefers orchestrator-provided ``_logical_timestamp`` when
+    available. Otherwise it derives from a fixed UTC epoch plus deterministic
+    offsets from ``tick_counter``, ``cycle_type``, and ``sequence_index``.
+    """
+    logical_ts = event.get("_logical_timestamp")
+    created_at_dt = None
+
+    if isinstance(logical_ts, str) and logical_ts:
+        try:
+            created_at_dt = datetime.fromisoformat(logical_ts.replace("Z", "+00:00"))
+            if created_at_dt.tzinfo is None:
+                created_at_dt = created_at_dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            created_at_dt = None
+
+    if created_at_dt is None:
+        base = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        cycle_slot = _CYCLE_ORDER.get(cycle_type, 9)
+        created_at_dt = base + timedelta(
+            minutes=(state.tick_counter * 60) + (cycle_slot * 10),
+            seconds=sequence_index,
+        )
+    else:
+        created_at_dt = created_at_dt + timedelta(microseconds=sequence_index)
+
+    created_at = created_at_dt.isoformat()
+    identity = (
+        f"tick:{state.tick_counter}|cycle:{cycle_type}|"
+        f"record:{record_type}|seq:{sequence_index}|ts:{created_at}"
+    )
+    record_id = str(uuid5(NAMESPACE_URL, identity))
+    return {"id": record_id, "created_at": created_at}
 
 
 def try_store_append(store: Any, record: Dict, state: AgentState, event: Dict) -> None:
