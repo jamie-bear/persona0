@@ -35,8 +35,14 @@ def world_ingest(state: AgentState, event: Dict[str, Any], pending_writes: List)
 
 
 def appraise(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
-    """2. APPRAISE — stub (LLM-dependent). Leaves appraisal_results empty."""
-    event.setdefault("appraisal_results", [])
+    """2. APPRAISE — adapter-generated appraisal with validated structure."""
+    cfg = load_config_section("llm_adapter")
+    if not bool(cfg.get("enabled", False)):
+        event.setdefault("appraisal_results", [])
+        return
+
+    raw_results = llm_adapter.appraise_events(event.get("activity_events", []), state)
+    event["appraisal_results"] = llm_adapter.validate_appraisal_results(raw_results)
 
 
 def update_emotion(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
