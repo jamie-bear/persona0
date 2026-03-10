@@ -72,6 +72,9 @@ class CycleLogEntry:
     rollback: bool = False
     rollback_reason: Optional[str] = None
     duration_ms: int = 0
+    correlation_id: Optional[str] = None
+    request_id: Optional[str] = None
+    session_id: Optional[str] = None
 
     def to_jsonl(self) -> str:
         """Serialize to a single JSONL line."""

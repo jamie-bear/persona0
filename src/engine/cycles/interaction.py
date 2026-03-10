@@ -10,8 +10,7 @@ from typing import Any, Dict, List
 from ...schema.state import AgentState
 from ..adapters.embeddings import embed_text
 from ..retrieval import load_retrieval_limits, rank_memory_candidates
-from ..adapters import llm as llm_adapter
-from ..modules._config import load_config_section
+from ..telemetry import default_telemetry, telemetry_labels
 
 
 def ingest_turn(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -26,43 +25,45 @@ def retrieve_memory_candidates(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
     """C. retrieve_memory_candidates — vector search then rerank for explainability."""
-    limits = load_retrieval_limits()
-    top_k = int(limits["candidate_limit"])
-    records = list(event.get("memory_records", []))
-    record_by_id = {str(r.get("id")): r for r in records if r.get("id")}
+    with default_telemetry.time_block("interaction_step_latency_ms", telemetry_labels({"step": "retrieve_memory_candidates"})):
+        limits = load_retrieval_limits()
+        top_k = int(limits["candidate_limit"])
+        records = list(event.get("memory_records", []))
+        record_by_id = {str(r.get("id")): r for r in records if r.get("id")}
 
-    query_text = str(event.get("message", ""))
-    query_embedded = embed_text(query_text, content_type="user_turn")
-    event["query_embedding"] = query_embedded["metadata"]
+        query_text = str(event.get("message", ""))
+        query_embedded = embed_text(query_text, content_type="user_turn")
+        event["query_embedding"] = query_embedded["metadata"]
 
-    candidates: List[Dict[str, Any]] = []
-    vector_store = event.get("_vector_store")
-    if vector_store is not None:
-        vector_hits = vector_store.query(
-            query_embedded["vector"],
-            top_k=top_k,
-            filters=event.get("vector_filters"),
-        )
-        for hit in vector_hits:
-            rid = str(hit.get("id", ""))
-            if not rid:
-                continue
-            base = dict(record_by_id.get(rid, {}))
-            base.setdefault("id", rid)
-            base["similarity"] = float(hit.get("similarity", base.get("similarity", 0.0)))
-            candidates.append(base)
+        candidates: List[Dict[str, Any]] = []
+        vector_store = event.get("_vector_store")
+        if vector_store is not None:
+            vector_hits = vector_store.query(
+                query_embedded["vector"],
+                top_k=top_k,
+                filters=event.get("vector_filters"),
+            )
+            for hit in vector_hits:
+                rid = str(hit.get("id", ""))
+                if not rid:
+                    continue
+                base = dict(record_by_id.get(rid, {}))
+                base.setdefault("id", rid)
+                base["similarity"] = float(hit.get("similarity", base.get("similarity", 0.0)))
+                candidates.append(base)
 
-    if not candidates:
-        candidates = records
+        if not candidates:
+            candidates = records
 
-    event["memory_candidates"] = rank_memory_candidates(candidates, top_k=top_k)
+        event["memory_candidates"] = rank_memory_candidates(candidates, top_k=top_k)
 
 
 def salience_competition(
     state: AgentState, event: Dict[str, Any], pending_writes: List
 ) -> None:
     """D. salience_competition — select what enters working context (capacity: 5)."""
-    limits = load_retrieval_limits()
+    with default_telemetry.time_block("interaction_step_latency_ms", telemetry_labels({"step": "salience_competition"})):
+        limits = load_retrieval_limits()
     capacity = int(limits["salience_buffer_capacity"])
     candidates = event.get("memory_candidates", [])
     selected = [c.get("id") for c in candidates if c.get("id")][:capacity]
@@ -186,6 +187,10 @@ def policy_and_consistency_check(
 
     summary = combined.summary()
     event["_policy_check_result"] = summary
+    if summary.get("blocked", 0) > 0:
+        default_telemetry.increment("policy_block_total", labels=telemetry_labels())
+    if summary.get("warnings", 0) > 0:
+        default_telemetry.increment("policy_warning_total", labels=telemetry_labels())
 
     if not combined.passed:
         from ..orchestrator import PolicyViolation
