@@ -81,6 +81,7 @@ def generate_thought(state: AgentState, event: Dict[str, Any], pending_writes: L
     cats = list(state.consecutive_thought_categories)
     cats.append(thought["thought_category"])
     state.consecutive_thought_categories = cats[-3:]  # keep last 3
+    pending_writes.append({"field_path": "consecutive_thought_categories", "author_module": "ThoughtGenerator"})
 
 
 def salience_filter(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

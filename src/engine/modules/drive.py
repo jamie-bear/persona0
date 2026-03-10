@@ -7,8 +7,6 @@ Reference: drive_system.md §3-§5, cognitive_loop.md §3.1 step 3.5, §3.2 step
 """
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from ...schema.state import DriveState
@@ -84,8 +82,11 @@ class DriveModule:
         if drive_value < threshold:
             return None
 
+        # Deterministic ID — replay-safe (no uuid4)
+        desire_id = f"desire-{drive_name}-{tick_counter}"
+
         return {
-            "id": str(uuid.uuid4()),
+            "id": desire_id,
             "source_drive": drive_name,
             "urgency": round(drive_value, 4),
             "approach": True,          # simplified: all desires start as approach
@@ -166,7 +167,7 @@ class DriveModule:
                 "horizon": "short",
                 "progress": 0.0,
                 "crystallized_from_drive": drive,
-                "crystallized_at": datetime.now(timezone.utc).isoformat(),
+                "crystallized_at": f"tick:{desire.get('created_at_tick', 0)}",
                 "source_desire_id": desire.get("id"),
             })
             proposed_drives.add(drive)

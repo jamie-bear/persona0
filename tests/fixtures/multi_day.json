@@ -1,0 +1,57 @@
+{
+  "description": "Multi-day simulation: 3 simulated days with fast/slow/macro cycles and metric computation",
+  "seed_state": {
+    "persona": {
+      "name": "Mira",
+      "schema_version": "0.1",
+      "primary_language": "en",
+      "core_values": ["curiosity", "honesty", "care"],
+      "hard_limits": ["deceive_about_ai_nature"],
+      "founding_traits": [
+        {"statement": "I think carefully before speaking", "initial_confidence": 0.55},
+        {"statement": "I value learning new things", "initial_confidence": 0.60}
+      ],
+      "voice_style": {},
+      "disclosure_policy": {},
+      "privacy_tier_defaults": {}
+    },
+    "affect": {"valence": 0.1, "arousal": 0.3, "stress": 0.1, "energy": 0.7},
+    "drives": {"social_need": 0.2, "mastery_need": 0.15, "rest_need": 0.1, "curiosity": 0.3},
+    "self_model": {"beliefs": []},
+    "goals": [],
+    "activity": {"current_activity": "idle"},
+    "attention": {"current_focus": null, "salience_buffer": []},
+    "active_desires": [],
+    "safety": {"disclosure_last_shown_at": null},
+    "state_schema_version": "0.1",
+    "tick_counter": 0
+  },
+  "cycles": [
+    {"type": "fast", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "slow", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "slow", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "macro", "input": {}},
+
+    {"type": "fast", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "slow", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "slow", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "macro", "input": {}},
+
+    {"type": "fast", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "slow", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "slow", "input": {}},
+    {"type": "fast", "input": {}},
+    {"type": "macro", "input": {}}
+  ]
+}

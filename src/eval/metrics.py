@@ -1,13 +1,16 @@
-"""Checkpoint-aligned evaluators for retrieval quality and reflection safety.
+"""Checkpoint-aligned evaluators for retrieval quality, reflection safety,
+and longitudinal coherence metrics (MCS, ISS, ECI).
 
 References:
 - .knowledge/execution/v0.1/checkpoints/execution_checkpoints.md (CP-2, CP-4)
+- architecture.md §6 (quantitative evaluation metrics)
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, Mapping, Sequence
+import math
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Mapping, Sequence
 
 
 @dataclass(frozen=True)
@@ -120,4 +123,169 @@ def evaluate_self_belief_safety(
         "passes_confidence_delta_cap": accepted_delta_violations == 0,
         "passes_contradiction_rejection": accepted_contradictions == 0,
         "passes": accepted_delta_violations == 0 and accepted_contradictions == 0,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CP-6: Longitudinal coherence metrics
+# Reference: architecture.md §6 — MCS, ISS, ECI
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class CycleSnapshot:
+    """Minimal snapshot of one cycle's state for metric computation.
+
+    Constructed from cycle log entries or direct state observations.
+    """
+
+    tick: int
+    beliefs: List[Dict[str, float]] = field(default_factory=list)
+    """[{'statement': str, 'confidence': float}, ...]"""
+
+    affect: Dict[str, float] = field(default_factory=dict)
+    """{'valence': float, 'arousal': float, 'stress': float, 'energy': float}"""
+
+    episodic_count: int = 0
+    """Count of active episodic records at this tick."""
+
+    rollback: bool = False
+    """Whether this cycle was rolled back."""
+
+
+def compute_mcs(snapshots: Sequence[CycleSnapshot]) -> Dict[str, float]:
+    """Memory Coherence Score — measures consistency of episodic record counts.
+
+    MCS = 1 - (stddev(episodic_count_deltas) / max(mean_count, 1))
+
+    A score of 1.0 means perfectly steady memory accumulation.
+    Values below 0.5 indicate erratic memory behavior.
+
+    Reference: architecture.md §6 — Memory Coherence Score
+    """
+    if len(snapshots) < 2:
+        return {"mcs": 1.0, "sample_count": len(snapshots)}
+
+    counts = [s.episodic_count for s in snapshots]
+    deltas = [counts[i + 1] - counts[i] for i in range(len(counts) - 1)]
+
+    mean_count = sum(counts) / len(counts)
+    if mean_count < 1:
+        mean_count = 1.0
+
+    mean_delta = sum(deltas) / len(deltas) if deltas else 0.0
+    variance = sum((d - mean_delta) ** 2 for d in deltas) / len(deltas) if deltas else 0.0
+    stddev = math.sqrt(variance)
+
+    mcs = max(0.0, min(1.0, 1.0 - (stddev / mean_count)))
+    return {
+        "mcs": round(mcs, 4),
+        "sample_count": len(snapshots),
+        "mean_episodic_count": round(mean_count, 2),
+        "delta_stddev": round(stddev, 4),
+    }
+
+
+def compute_iss(snapshots: Sequence[CycleSnapshot]) -> Dict[str, float]:
+    """Identity Stability Score — measures self-belief confidence drift.
+
+    ISS = 1 - mean(max_confidence_change per belief across window)
+
+    A score of 1.0 means beliefs are perfectly stable.
+    Values below 0.5 indicate excessive identity drift.
+
+    Reference: architecture.md §6 — Identity Stability Score
+    """
+    if len(snapshots) < 2:
+        return {"iss": 1.0, "sample_count": len(snapshots), "belief_count": 0}
+
+    # Track confidence per statement across time
+    belief_tracks: Dict[str, List[float]] = {}
+    for snap in snapshots:
+        for b in snap.beliefs:
+            stmt = b.get("statement", "")
+            conf = float(b.get("confidence", 0.0))
+            belief_tracks.setdefault(stmt, []).append(conf)
+
+    if not belief_tracks:
+        return {"iss": 1.0, "sample_count": len(snapshots), "belief_count": 0}
+
+    max_changes = []
+    for stmt, confs in belief_tracks.items():
+        if len(confs) < 2:
+            continue
+        max_change = max(abs(confs[i + 1] - confs[i]) for i in range(len(confs) - 1))
+        max_changes.append(max_change)
+
+    if not max_changes:
+        return {"iss": 1.0, "sample_count": len(snapshots), "belief_count": len(belief_tracks)}
+
+    mean_max_change = sum(max_changes) / len(max_changes)
+    iss = max(0.0, min(1.0, 1.0 - mean_max_change))
+
+    return {
+        "iss": round(iss, 4),
+        "sample_count": len(snapshots),
+        "belief_count": len(belief_tracks),
+        "mean_max_confidence_change": round(mean_max_change, 4),
+    }
+
+
+def compute_eci(snapshots: Sequence[CycleSnapshot]) -> Dict[str, float]:
+    """Emotional Consistency Index — measures affect smoothness over time.
+
+    ECI = 1 - mean(per-tick euclidean distance in affect space)
+
+    A score of 1.0 means affect never changed.
+    Values below 0.3 indicate chaotic emotional dynamics.
+
+    Reference: architecture.md §6 — Emotional Consistency Index
+    """
+    if len(snapshots) < 2:
+        return {"eci": 1.0, "sample_count": len(snapshots)}
+
+    affect_keys = ["valence", "arousal", "stress", "energy"]
+    distances = []
+
+    for i in range(len(snapshots) - 1):
+        a = snapshots[i].affect
+        b = snapshots[i + 1].affect
+        dist_sq = sum(
+            (float(a.get(k, 0.0)) - float(b.get(k, 0.0))) ** 2
+            for k in affect_keys
+        )
+        distances.append(math.sqrt(dist_sq))
+
+    mean_dist = sum(distances) / len(distances)
+    # Normalize: max possible distance in 4D [-1,1] space is sqrt(4*4) = 4
+    normalized = mean_dist / 4.0
+    eci = max(0.0, min(1.0, 1.0 - normalized))
+
+    return {
+        "eci": round(eci, 4),
+        "sample_count": len(snapshots),
+        "mean_affect_distance": round(mean_dist, 4),
+    }
+
+
+def compute_all_metrics(
+    snapshots: Sequence[CycleSnapshot],
+) -> Dict[str, Dict[str, float]]:
+    """Compute all three longitudinal metrics from a sequence of cycle snapshots."""
+    return {
+        "mcs": compute_mcs(snapshots),
+        "iss": compute_iss(snapshots),
+        "eci": compute_eci(snapshots),
+    }
+
+
+def rollback_rate(snapshots: Sequence[CycleSnapshot]) -> Dict[str, float]:
+    """Compute the rollback rate across a sequence of cycles."""
+    if not snapshots:
+        return {"rollback_rate": 0.0, "total_cycles": 0, "rollbacks": 0}
+    rollbacks = sum(1 for s in snapshots if s.rollback)
+    return {
+        "rollback_rate": round(rollbacks / len(snapshots), 4),
+        "total_cycles": len(snapshots),
+        "rollbacks": rollbacks,
     }

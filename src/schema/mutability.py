@@ -186,6 +186,7 @@ def build_default_registry() -> FieldOwnershipRegistry:
         ("attention.current_focus", "SalienceGate", "Current focus topic"),
         ("active_desires", "DriveModule", "Ephemeral desire objects; not persisted"),
         ("persisted_desires", "DriveModule", "Desires carried across slow ticks; not long-term"),
+        ("consecutive_thought_categories", "ThoughtGenerator", "Last N thought categories; cleared at macro cycle"),
         ("appraisal_results", "AppraisalModule", "Per-tick appraisal outputs"),
         ("context_package", "ContextBuilder", "Assembled prompt context; discarded after render"),
         ("candidate_response", "LLMRenderer", "Draft response; discarded on commit/rollback"),
