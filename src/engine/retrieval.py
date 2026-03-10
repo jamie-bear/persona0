@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
-import yaml
+
+from .modules._config import load_config_section
 
 
 @dataclass(frozen=True)
@@ -17,10 +17,7 @@ class RetrievalWeights:
 
 
 def _load_retrieval_config() -> Dict[str, Any]:
-    config_path = Path(__file__).resolve().parents[2] / "config" / "defaults.yaml"
-    with config_path.open("r", encoding="utf-8") as fh:
-        defaults = yaml.safe_load(fh) or {}
-    return defaults.get("retrieval", {})
+    return load_config_section("retrieval")
 
 
 def load_weights() -> RetrievalWeights:

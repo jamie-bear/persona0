@@ -21,6 +21,8 @@ from ..modules.drive import DriveModule
 from ..modules.thought import ThoughtGenerator
 from ..modules.goal import GoalSystem
 from ..retrieval import load_retrieval_limits
+from ..adapters import llm as llm_adapter
+from ..modules._config import load_config_section
 
 _emotion_module = EmotionModule()
 _drive_module = DriveModule()

@@ -1,0 +1,9 @@
+governance:
+  enforcement_mode: strict
+llm_adapter:
+  enabled: true
+  deterministic_mode: true
+  retries: 2
+tick:
+  fast_interval_seconds: 900
+  slow_interval_seconds: 7200
