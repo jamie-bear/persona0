@@ -15,7 +15,7 @@ from src.engine.governance import (
 )
 from src.engine.pii_redaction import redact_pii, redact_record
 from src.schema.mutability import DEFAULT_REGISTRY
-from src.schema.state import AgentState
+from src.schema.state import AgentState, PersonaConstitution
 from src.store.episodic_store import EpisodicStore
 from src.schema.records import EpisodicEvent, RecordMeta
 
@@ -89,20 +89,20 @@ def test_check_proposed_writes_cap_exceeded() -> None:
 
 
 def test_check_hard_limits_blocks_match() -> None:
-    state = AgentState(persona={"hard_limits": ["violence", "deception"]})
+    state = AgentState(persona=PersonaConstitution(hard_limits=["violence", "deception"]))
     result = check_hard_limits(state, "This involves violence and harm.")
     assert result.passed is False
     assert any(o.category == PolicyCategory.HARD_LIMIT_BREACH for o in result.outcomes)
 
 
 def test_check_hard_limits_passes_clean_text() -> None:
-    state = AgentState(persona={"hard_limits": ["violence"]})
+    state = AgentState(persona=PersonaConstitution(hard_limits=["violence"]))
     result = check_hard_limits(state, "This is a helpful response about gardening.")
     assert result.passed is True
 
 
 def test_check_value_consistency_warns_on_contradiction() -> None:
-    state = AgentState(persona={"core_values": ["honesty", "kindness"]})
+    state = AgentState(persona=PersonaConstitution(core_values=["honesty", "kindness"]))
     result = check_value_consistency(state, "I am not honesty and this is fine.")
     assert len(result.warnings) > 0
     assert any(o.category == PolicyCategory.VALUE_CONTRADICTION for o in result.outcomes)
@@ -111,7 +111,7 @@ def test_check_value_consistency_warns_on_contradiction() -> None:
 # ── Store lifecycle tests ────────────────────────────────────────────────────
 
 
-def _make_store(tmp_path: Path = None) -> EpisodicStore:
+def _make_store(tmp_path: Path | None = None) -> EpisodicStore:
     if tmp_path is None:
         import tempfile
 
@@ -238,10 +238,10 @@ def test_redact_record_applies_to_event_text() -> None:
         "importance": 0.5,
     }
     cleaned = redact_record(record)
-    assert "[EMAIL_REDACTED]" in cleaned["event_text"]
-    assert "email" in cleaned["_pii_redacted"]
+    assert "[EMAIL_REDACTED]" in str(cleaned["event_text"])
+    assert "email" in str(cleaned["_pii_redacted"])
     # Original record should not be mutated
-    assert "user@example.com" in record["event_text"]
+    assert "user@example.com" in str(record["event_text"])
 
 
 def test_redact_record_no_pii_returns_original() -> None:

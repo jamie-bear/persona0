@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from src.engine.cycles.macro import (
     archive_reflection,
     cluster_episodes,
@@ -12,7 +14,7 @@ from src.engine.cycles.macro import (
     select_high_signal_episodes,
     update_self_beliefs,
 )
-from src.schema.state import AgentState, GoalRecord, SelfBelief
+from src.schema.state import AgentState, GoalRecord, SelfBelief, SelfModelState
 from src.store.episodic_store import EpisodicStore
 
 
@@ -51,7 +53,7 @@ def test_select_high_signal_episodes_top_k_ordering() -> None:
 
     select_high_signal_episodes(state, event, [])
 
-    selected_ids = [r["id"] for r in event["_macro_selected_episodes"]]
+    selected_ids = [r["id"] for r in cast(list, event["_macro_selected_episodes"])]
     assert selected_ids == ["e2", "e3"]
 
 
@@ -64,7 +66,7 @@ def test_macro_pipeline_updates_self_beliefs_with_pending_write() -> None:
             _episode("e3", 0.8, goal="g1", created_at="2026-01-02T01:00:00Z"),
         ],
     }
-    pending = []
+    pending: list[dict[str, Any]] = []
 
     select_high_signal_episodes(state, event, pending)
     cluster_episodes(state, event, pending)
@@ -84,7 +86,7 @@ def test_confidence_capped_without_two_supporting_reflections() -> None:
         confidence=0.74,
         source_type="REFLECTION",
     )
-    state = AgentState(self_model={"beliefs": [belief.model_dump()]})
+    state = AgentState(self_model=SelfModelState(beliefs=[belief]))
     event = {
         "_macro_scored_reflections": [
             {
@@ -98,7 +100,8 @@ def test_confidence_capped_without_two_supporting_reflections() -> None:
         ]
     }
 
-    update_self_beliefs(state, event, pending := [])
+    pending: list[dict[str, Any]] = []
+    update_self_beliefs(state, event, pending)
 
     assert state.self_model.beliefs[0].confidence == 0.75
     assert len(state.self_model.beliefs[0].supporting_reflections) == 1
@@ -118,11 +121,11 @@ def test_archive_reflection_emits_semantic_store_write() -> None:
             }
         ]
     }
-    pending = []
+    pending: list[dict[str, Any]] = []
 
     archive_reflection(state, event, pending)
 
-    assert len(event["_pending_reflections"]) == 1
+    assert len(cast(list, event["_pending_reflections"])) == 1
     assert any(w["field_path"] == "semantic_store" for w in pending)
 
 
@@ -131,7 +134,7 @@ def test_drive_review_reports_unmet_drives() -> None:
     state.drives.social_need = 0.75
     state.drives.mastery_need = 0.65
 
-    event = {}
+    event: dict[str, Any] = {}
     drive_review(state, event, [])
 
     assert event["_macro_unmet_drives"] == [{"drive": "social_need", "value": 0.75}]
@@ -191,11 +194,12 @@ def test_decay_unreinforced_beliefs_reduces_confidence() -> None:
         supporting_reflections=["refl-000001-001"],  # tick 1
     )
     state = AgentState(
-        self_model={"beliefs": [belief.model_dump()]},
+        self_model=SelfModelState(beliefs=[belief]),
         tick_counter=20,  # 20 days since tick 1 > 14-day threshold
     )
 
-    decay_unreinforced_beliefs(state, {"_macro_accepted_reflections": []}, pending := [])
+    pending: list[dict[str, Any]] = []
+    decay_unreinforced_beliefs(state, {"_macro_accepted_reflections": []}, pending)
 
     assert state.self_model.beliefs[0].confidence < 0.60
     assert state.self_model.beliefs[0].confidence == round(0.60 - 0.02, 4)
@@ -211,11 +215,12 @@ def test_decay_skips_const_seed_beliefs() -> None:
         source_type="CONST_SEED",
     )
     state = AgentState(
-        self_model={"beliefs": [belief.model_dump()]},
+        self_model=SelfModelState(beliefs=[belief]),
         tick_counter=100,  # Very old
     )
 
-    decay_unreinforced_beliefs(state, {"_macro_accepted_reflections": []}, pending := [])
+    pending: list[dict[str, Any]] = []
+    decay_unreinforced_beliefs(state, {"_macro_accepted_reflections": []}, pending)
 
     assert state.self_model.beliefs[0].confidence == 0.55
     assert not any(w["field_path"] == "self_model.beliefs" for w in pending)
@@ -231,7 +236,7 @@ def test_decay_skips_recently_reinforced_beliefs() -> None:
         supporting_reflections=["refl-000001-001"],  # old
     )
     state = AgentState(
-        self_model={"beliefs": [belief.model_dump()]},
+        self_model=SelfModelState(beliefs=[belief]),
         tick_counter=100,
     )
     event = {"_macro_accepted_reflections": [{"proposed_self_belief_update": "I enjoy reading."}]}
@@ -251,14 +256,14 @@ def test_decay_tracks_archival_candidates() -> None:
         supporting_reflections=["refl-000001-001"],
     )
     state = AgentState(
-        self_model={"beliefs": [belief.model_dump()]},
+        self_model=SelfModelState(beliefs=[belief]),
         tick_counter=50,
     )
 
-    event: dict = {"_macro_accepted_reflections": []}
+    event: dict[str, Any] = {"_macro_accepted_reflections": []}
     decay_unreinforced_beliefs(state, event, [])
 
-    assert "b1" in event["_macro_archival_candidates"]
+    assert "b1" in cast(list, event["_macro_archival_candidates"])
 
 
 # ── CP-4.2: Recency window filter tests ─────────────────────────────────────
@@ -279,7 +284,7 @@ def test_recency_window_filters_old_episodes() -> None:
 
     select_high_signal_episodes(state, event, [])
 
-    selected_ids = [r["id"] for r in event["_macro_selected_episodes"]]
+    selected_ids = [r["id"] for r in cast(list, event["_macro_selected_episodes"])]
     assert "e3" not in selected_ids
     assert "e1" in selected_ids
     assert "e2" in selected_ids
@@ -300,7 +305,7 @@ def test_recency_window_keeps_all_when_within_range() -> None:
 
     select_high_signal_episodes(state, event, [])
 
-    assert len(event["_macro_selected_episodes"]) == 3
+    assert len(cast(list, event["_macro_selected_episodes"])) == 3
 
 
 # ── CP-4.3: Goal review lifecycle tests ──────────────────────────────────────
@@ -418,8 +423,8 @@ def test_compact_episodic_memory_runs_cool_and_archive() -> None:
         event = {"_store": store}
         compact_episodic_memory(AgentState(), event, [])
 
-        summary = event["_macro_memory_compaction"]
+        summary = cast(dict[str, Any], event["_macro_memory_compaction"])
         assert summary["enabled"] is True
-        assert "e1" in summary["cooled_ids"]
-        assert "e1" in summary["archived_ids"]
+        assert "e1" in cast(list, summary["cooled_ids"])
+        assert "e1" in cast(list, summary["archived_ids"])
         assert store.count("archived") == 1
