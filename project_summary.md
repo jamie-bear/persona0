@@ -141,7 +141,7 @@ Persona0 is in an **active implementation phase** — CP-0 through CP-5 are comp
 | `trace_viewer` | `src/cli/trace_viewer.py` | Human-readable rendering of cycle logs, policy outcomes, and macro-cycle details |
 | `metrics` | `src/eval/metrics.py` | `CycleSnapshot`-based MCS/ISS/ECI computation, `rollback_rate`, `compute_all_metrics` |
 | Config loader | `src/engine/modules/_config.py` | Cached YAML section loader (includes `load_reflection_config`, `load_goals_config`, etc.) |
-| Step factory | `src/engine/default_setup.py` | `register_default_steps()` — wires all cycle steps including `decay_unreinforced_beliefs` onto an `EgoOrchestrator` |
+| Step factory | `src/engine/default_setup.py` | `register_default_steps()` — wires all cycle steps (including `decay_unreinforced_beliefs` and `compact_episodic_memory`) onto an `EgoOrchestrator` |
 
 ### CP-3 Exit Gates (all verified)
 

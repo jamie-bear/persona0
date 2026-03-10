@@ -59,6 +59,7 @@ ARCHIVE_REFLECTION = "archive_reflection"
 MEMORY_COMPACTION = "memory_compaction"
 GOAL_REVIEW = "goal_review"
 DRIVE_REVIEW = "drive_review"
+COMPACT_EPISODIC_MEMORY = "compact_episodic_memory"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ MACRO_STEPS: List[str] = [
     MEMORY_COMPACTION,
     GOAL_REVIEW,
     DRIVE_REVIEW,
+    COMPACT_EPISODIC_MEMORY,
     LOG_CYCLE,
 ]
 
