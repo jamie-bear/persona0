@@ -4,9 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List
 
-import time
-
-import yaml
+from .modules._config import load_config_section
 
 from .telemetry import default_telemetry, telemetry_labels
 
@@ -20,7 +18,7 @@ class RetrievalWeights:
 
 
 def _load_retrieval_config() -> Dict[str, Any]:
-    return load_config_section("retrieval")
+    return dict(load_config_section("retrieval"))
 
 
 def load_weights() -> RetrievalWeights:

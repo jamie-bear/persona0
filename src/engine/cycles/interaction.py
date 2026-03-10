@@ -10,7 +10,8 @@ from typing import Any, Dict, List
 from ...schema.state import AgentState
 from ..adapters.embeddings import embed_text
 from ..retrieval import load_retrieval_limits, rank_memory_candidates
-from ..telemetry import default_telemetry, telemetry_labels
+from ..adapters import llm as llm_adapter
+from ..modules._config import load_config_section
 
 
 def ingest_turn(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
@@ -161,7 +162,6 @@ def policy_and_consistency_check(
         check_value_consistency,
     )
     from ...schema.mutability import DEFAULT_REGISTRY
-    from ..modules._config import load_config_section
 
     gov_cfg = load_config_section("governance")
     max_writes = int(gov_cfg.get("max_writes_per_transaction", 50))

@@ -1,0 +1,8 @@
+llm_adapter:
+  enabled: true
+  provider: openai
+  model: gpt-4o-mini
+  deterministic_mode: false
+
+governance:
+  enforcement_mode: strict
