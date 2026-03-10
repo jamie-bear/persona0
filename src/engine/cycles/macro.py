@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from ...schema.state import AgentState, SelfBelief
-from ..modules._config import load_reflection_config
+from ..modules._config import load_memory_config, load_reflection_config
 
 
 def select_high_signal_episodes(
@@ -393,6 +393,40 @@ def drive_review(state: AgentState, event: Dict[str, Any], pending_writes: List)
     if state.consecutive_thought_categories:
         state.consecutive_thought_categories = []
         pending_writes.append({"field_path": "consecutive_thought_categories", "author_module": "ThoughtGenerator"})
+
+
+def compact_episodic_memory(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:
+    """9. Compact episodic store lifecycle state (active→cooling→archived).
+
+    This step is best-effort and no-op when no ``_store`` is injected.
+    It records an observability payload in ``event['_macro_memory_compaction']``.
+    """
+    store = event.get("_store")
+    if store is None:
+        event["_macro_memory_compaction"] = {
+            "enabled": False,
+            "cooled_ids": [],
+            "archived_ids": [],
+        }
+        return
+
+    cfg = load_memory_config()
+    cooled = store.cool_records(
+        max_records=int(cfg.get("max_records_cooled_per_cycle", 100)),
+        importance_threshold=float(cfg.get("importance_cooling_threshold", 0.15)),
+        decay_threshold=float(cfg.get("decay_cooling_threshold", 0.10)),
+    )
+    archived = store.archive_cooled(
+        max_records=int(cfg.get("max_records_archived_per_cycle", 50))
+    )
+
+    event["_macro_memory_compaction"] = {
+        "enabled": True,
+        "cooled_ids": cooled,
+        "archived_ids": archived,
+        "cooled_count": len(cooled),
+        "archived_count": len(archived),
+    }
 
 
 def _load_candidate_episodes(event: Dict[str, Any]) -> List[Dict[str, Any]]:

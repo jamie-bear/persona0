@@ -133,7 +133,15 @@ def policy_and_consistency_check(
         for outcome in value_result.outcomes:
             combined.add(outcome)
 
-    event["_policy_check_result"] = combined.summary()
+    summary = combined.summary()
+    event["_policy_check_result"] = summary
+
+    if not combined.passed:
+        from ..orchestrator import PolicyViolation
+        blocked = summary.get("block_categories", [])
+        raise PolicyViolation(
+            "Policy check failed: " + ", ".join(blocked or ["unknown"])
+        )
 
 
 def commit_or_rollback(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

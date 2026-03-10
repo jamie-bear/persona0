@@ -1,3 +1,5 @@
+import pytest
+
 from src.engine.cycles.interaction import (
     build_context_package,
     render_response,
@@ -5,6 +7,7 @@ from src.engine.cycles.interaction import (
     salience_competition,
 )
 from src.engine.retrieval import load_retrieval_limits, rank_memory_candidates
+from src.engine.orchestrator import PolicyViolation
 from src.schema.state import AgentState
 
 
