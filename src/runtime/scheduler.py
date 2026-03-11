@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import random
 import signal
+import time as _time_mod
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -81,7 +82,7 @@ class RuntimeScheduler:
         self.cadence = cadence or SchedulerCadence.from_defaults()
         self.retry_policy = retry_policy or RetryPolicy()
         self._sleep = sleep_fn or asyncio.sleep
-        self._time = time_fn or asyncio.get_running_loop().time
+        self._time = time_fn or _time_mod.monotonic
         self._jitter = jitter_fn or random.uniform
         self._startup_hooks = startup_hooks or []
         self._shutdown_hooks = shutdown_hooks or []

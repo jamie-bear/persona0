@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ..engine.modules._config import validate_runtime_config
+from ..engine.modules._config import validate_startup_config
 
 
 def main() -> None:
@@ -16,7 +16,7 @@ def main() -> None:
         return
 
     try:
-        validate_runtime_config()
+        validate_startup_config()
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1) from exc

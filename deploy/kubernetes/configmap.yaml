@@ -6,3 +6,4 @@ metadata:
     app: persona0
 data:
   PERSONA0_CONFIG_ENV: "prod"
+  PERSONA0_CONFIG_PROFILE: "prod"
