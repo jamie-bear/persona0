@@ -4,7 +4,7 @@ The goal of the Persona0 project is to design, deploy, and test a lightweight "E
 
 > **Note:**\
 > Read [./project_summary.md](/project_summary.md) for a basic overview of the development process for this project.\
-> Read [./persona0_deployment_guide_v0.10.m](/persona0_deployment_guide_v0.10.md) for guidance on how to use this repo.
+> Read [./persona0_deployment_guide_v0.10.md](/persona0_deployment_guide_v0.10.md) for guidance on how to use this repo.
 
 ---
 
