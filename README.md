@@ -1,9 +1,9 @@
 **Persona0** is a design for an ego-perspective cognitive agent architecture.
 
-The goal of the Persona0 project is to design, deploy, and test a lightweight "Ego Engine" architecture for humanlike AI chatbots. Featuring episodic memory, simulated affect/body states, and an off-screen life loop to create the illusion of continuity, personality, and time passage. The LLM acts only as a natural language renderer; all persistent "thinking" lives in external memory and deterministic state machines.
+The Persona0 project aims to design, implement and assess the effectiveness of a lightweight 'ego engine' architecture for human-like AI chatbots. The Ego Engine features episodic memory, simulated affect/body states, and an off-screen life loop to create the illusion of continuity, personality, and time passage. The LLM acts only as a natural language renderer; all persistent "thinking" lives in external memory and deterministic state machines.
 
 > **Note:**\
-> Read [./project_summary.md](/project_summary.md) for a basic overview of the development process for this project.\
+> Read [./project_summary.md](/project_summary.md) for a general status and overview of the development process.\
 > Read [./persona0_deployment_guide_v0.10.md](/persona0_deployment_guide_v0.10.md) for guidance on how to use this repo.
 
 ---
