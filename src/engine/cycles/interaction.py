@@ -69,14 +69,14 @@ def salience_competition(state: AgentState, event: Dict[str, Any], pending_write
         "interaction_step_latency_ms", telemetry_labels({"step": "salience_competition"})
     ):
         limits = load_retrieval_limits()
-    capacity = int(limits["salience_buffer_capacity"])
-    candidates = event.get("memory_candidates", [])
-    selected = [c.get("id") for c in candidates if c.get("id")][:capacity]
+        capacity = int(limits["salience_buffer_capacity"])
+        candidates = event.get("memory_candidates", [])
+        selected = [c.get("id") for c in candidates if c.get("id")][:capacity]
 
-    state.attention.salience_buffer = selected
-    pending_writes.append(
-        {"field_path": "attention.salience_buffer", "author_module": "SalienceGate"}
-    )
+        state.attention.salience_buffer = selected
+        pending_writes.append(
+            {"field_path": "attention.salience_buffer", "author_module": "SalienceGate"}
+        )
 
 
 def appraisal_update(state: AgentState, event: Dict[str, Any], pending_writes: List) -> None:

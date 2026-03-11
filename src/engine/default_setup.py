@@ -36,7 +36,6 @@ from .contracts import (
     UPDATE_SELF_BELIEFS,
     DECAY_UNREINFORCED_BELIEFS,
     ARCHIVE_REFLECTION,
-    MEMORY_COMPACTION,
     GOAL_REVIEW,
     DRIVE_REVIEW,
     COMPACT_EPISODIC_MEMORY,
@@ -144,16 +143,6 @@ def register_default_steps(
     orchestrator.register_step(UPDATE_SELF_BELIEFS, macro.update_self_beliefs)
     orchestrator.register_step(DECAY_UNREINFORCED_BELIEFS, macro.decay_unreinforced_beliefs)
     orchestrator.register_step(ARCHIVE_REFLECTION, macro.archive_reflection)
-
-    if store is not None:
-
-        def _memory_compaction_with_store(state, event, pending_writes):
-            event.setdefault("_store", store)
-            macro.memory_compaction(state, event, pending_writes)
-
-        orchestrator.register_step(MEMORY_COMPACTION, _memory_compaction_with_store)
-    else:
-        orchestrator.register_step(MEMORY_COMPACTION, macro.memory_compaction)
 
     orchestrator.register_step(GOAL_REVIEW, macro.goal_review)
     orchestrator.register_step(DRIVE_REVIEW, macro.drive_review)
