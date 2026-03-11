@@ -1,6 +1,6 @@
 # Evaluation thresholds (checkpoint-aligned)
 
-These eval fixtures and tests enforce the execution checkpoints in `.knowledge/execution/v0.1/checkpoints/execution_checkpoints.md`:
+These eval fixtures and tests enforce the execution checkpoints in `_knowledge/execution/implementation_v0.10/checkpoints/execution_checkpoints.md`:
 
 - **CP-2 retrieval checks**
   - `self_relevant_top5_presence_rate >= 0.80` (explicit checkpoint threshold).

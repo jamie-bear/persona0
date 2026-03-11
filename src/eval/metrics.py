@@ -2,7 +2,7 @@
 and longitudinal coherence metrics (MCS, ISS, ECI).
 
 References:
-- .knowledge/execution/v0.1/checkpoints/execution_checkpoints.md (CP-2, CP-4)
+- _knowledge/execution/implementation_v0.10/checkpoints/execution_checkpoints.md (CP-2, CP-4)
 - architecture.md §6 (quantitative evaluation metrics)
 """
 

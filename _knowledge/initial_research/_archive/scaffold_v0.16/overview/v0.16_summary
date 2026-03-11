@@ -2,7 +2,7 @@
 
 All v0.15 files are committed and pushed. Here's the full analysis and proposal:
 
-* Conducted a full repo/doc analysis and created a new versioned knowledge baseline at .knowledge/initial_research/v0.16/ without touching existing v0.1 files. The new architecture spec now cleanly separates contracts, defines single-writer module ownership, adds governance controls, and formalizes transaction-safe conversation flow with measurable non-functional targets.
+* Conducted a full repo/doc analysis and created a new versioned knowledge baseline at _knowledge/initial_research/_archive/scaffold_v0.16/ without touching existing v0.1 files. The new architecture spec now cleanly separates contracts, defines single-writer module ownership, adds governance controls, and formalizes transaction-safe conversation flow with measurable non-functional targets.
 
 * Replaced the prior loosely scoped data guidance with a stricter ego-data specification including shared metadata/provenance, normalized record schemas, quality gates, drift controls, and privacy/erasure lifecycle hooks.
 

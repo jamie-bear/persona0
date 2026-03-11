@@ -12,12 +12,12 @@ This directory translates the v0.17 research specification into an execution-rea
 
 All requirements here are derived from:
 
-- `.knowledge/initial_research/v0.17/architecture.md`
-- `.knowledge/initial_research/v0.17/cognitive_loop.md`
-- `.knowledge/initial_research/v0.17/drive_system.md`
-- `.knowledge/initial_research/v0.17/self_editability_policy.md`
-- `.knowledge/initial_research/v0.17/ego_data.md`
-- `.knowledge/initial_research/v0.17/action_plan.md`
+- `_knowledge/initial_research/scaffold_v0.17/architecture.md`
+- `_knowledge/initial_research/scaffold_v0.17/cognitive_loop.md`
+- `_knowledge/initial_research/scaffold_v0.17/drive_system.md`
+- `_knowledge/initial_research/scaffold_v0.17/self_editability_policy.md`
+- `_knowledge/initial_research/scaffold_v0.17/ego_data.md`
+- `_knowledge/initial_research/scaffold_v0.17/action_plan.md`
 
 ## Document Map
 

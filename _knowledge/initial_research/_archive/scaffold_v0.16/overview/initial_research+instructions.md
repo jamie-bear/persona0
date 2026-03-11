@@ -58,11 +58,11 @@ Use a strict layered model:
 4. **Governance envelope** (policy + disclosure + audit)
 
 Reference companion docs:
-* `.knowledge/initial_research/v0.16/overview/initial_research+instructions.md`
-* `.knowledge/initial_research/v0.16/architecture.md`
-* `.knowledge/initial_research/v0.16/ego_data.md`
-* `.knowledge/initial_research/v0.16/cognitive_loop.md`
-* `.knowledge/initial_research/v0.16/action_plan.md`
+* `_knowledge/initial_research/_archive/scaffold_v0.16/overview/initial_research+instructions.md`
+* `_knowledge/initial_research/_archive/scaffold_v0.16/architecture.md`
+* `_knowledge/initial_research/_archive/scaffold_v0.16/ego_data.md`
+* `_knowledge/initial_research/_archive/scaffold_v0.16/cognitive_loop.md`
+* `_knowledge/initial_research/_archive/scaffold_v0.16/action_plan.md`
 
 ---
 
@@ -94,4 +94,4 @@ Require all of:
 * memory retention policy (`memory_lifecycle.md`)
 * adversarial scenario pack (`eval/adversarial_scenarios.md`)
 * benchmark harness spec (`eval/continuity_benchmark.md`)
-.knowledge/initial_research/v0.16/action_plan.md
+_knowledge/initial_research/_archive/scaffold_v0.16/action_plan.md

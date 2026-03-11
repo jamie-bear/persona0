@@ -275,9 +275,9 @@ Researching and specifying ego-perspective data is a good early step if you do i
 ## References
 
 ### Related Markdown files
-* [architecture.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/v0.1/architecture.md) 
-* [ego_data.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/v0.1/ego_data.md)  
-* [action_plan.md](https://github.com/jamie-bear/persona0/blob/main/.knowledge/initial_research/v0.1/action_plan.md)
+* [architecture.md](https://github.com/jamie-bear/persona0/blob/main/_knowledge/initial_research/_archive/scaffold_v0.1/architecture.md)
+* [ego_data.md](https://github.com/jamie-bear/persona0/blob/main/_knowledge/initial_research/_archive/scaffold_v0.1/ego_data.md)
+* [action_plan.md](https://github.com/jamie-bear/persona0/blob/main/_knowledge/initial_research/_archive/scaffold_v0.1/action_plan.md)
 
 1. [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
 2. [The role of emotion in believable agents](https://dl.acm.org/doi/10.1145/176789.176803)
