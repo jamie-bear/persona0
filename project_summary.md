@@ -42,8 +42,9 @@ Persona0 now includes the previously planned productionization increments:
 - **Config hardening exists** with typed settings, profiles, env overrides, and secret-handling guardrails (`src/engine/modules/_config.py`, `config/profiles/*`, `config/defaults.immutable.yaml`).
 - **Deployment assets exist** (`Dockerfile`, `deploy/kubernetes/*`, `docs/operations.md`).
 - **Observability exists** via cycle logs, telemetry, and metrics endpoint (`src/engine/cycle_log.py`, `src/engine/telemetry.py`, `src/runtime/metrics_server.py`).
+- **Deployment correctness fixed** — four production-blocking issues resolved (see Deployment Fixes below).
 
-In short: the codebase has moved from deterministic-core-only toward an operational stack with adapters and runtime infrastructure.
+In short: the codebase has moved from deterministic-core-only toward an operational stack with adapters and runtime infrastructure, and is now corrected for deployment.
 
 ---
 
@@ -59,6 +60,20 @@ In short: the codebase has moved from deterministic-core-only toward an operatio
 | CP-5 | Done | Governance outcomes, PII redaction, forget semantics, and memory lifecycle compaction implemented. |
 | CP-6 | Done | Metrics, latency checks, and multi-day replay tests implemented. |
 | Productionization follow-up | In progress | External provider integrations and persistent production backends remain to be finalized. |
+
+---
+
+## Deployment Fixes (applied)
+
+Four issues were found and corrected that would have broken a production deployment as-is:
+
+1. **Config path mismatch (critical)** — `healthcheck.py` called `validate_runtime_config()` (legacy path) while the scheduler uses `validate_startup_config()` (new path). Additionally, `PERSONA0_CONFIG_PROFILE` was absent from the Dockerfile and K8s configmap, causing the scheduler to silently default to the `dev` profile (mock LLM, audit-mode governance) in production. Fixed: healthcheck now uses `validate_startup_config()`; `PERSONA0_CONFIG_PROFILE=prod` added to `Dockerfile` and `deploy/kubernetes/configmap.yaml`.
+
+2. **Duplicate memory compaction (high)** — `MACRO_STEPS` included both `MEMORY_COMPACTION` and `COMPACT_EPISODIC_MEMORY`, which are functionally identical. Both called `cool_records()` + `archive_cooled()` with the same config, effectively doubling compaction throughput and violating the `max_records_cooled_per_cycle` cap. Fixed: `MEMORY_COMPACTION` removed from the contract and `default_setup.py` registration.
+
+3. **Scheduler clock default crashes outside async (medium)** — `RuntimeScheduler.__init__` eagerly evaluated `asyncio.get_running_loop().time`, raising `RuntimeError` if constructed outside an async context. Fixed: default changed to `time.monotonic`.
+
+4. **Telemetry block too narrow in `salience_competition` (low)** — The actual salience logic ran outside the `with time_block(...)` context manager, so only the config load was timed. Fixed: indentation corrected.
 
 ---
 
