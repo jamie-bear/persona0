@@ -1,401 +1,596 @@
-# Persona0 — Beginner Deployment Guide
+# PERSONA0 — Deployment & Testing Guide
 
-**Get the Ego Engine running and test its thesis in under 30 minutes.**
-
----
-
-## Before You Start: What Is Persona0?
-
-Persona0 tests a specific, provocative idea about how LLMs work:
-
-> *Human-like continuity doesn't come from the model itself — it comes from external memory, emotional state, and time-based updates. The LLM is just the voice. The "self" lives elsewhere.*
-
-If you've used ChatGPT's memory features or Claude Projects, you've experienced a shallow version of this: the model "remembers" things between sessions. Persona0 goes much further. It proposes a full **Ego Engine** — a deterministic system that runs *independently of the LLM* to maintain a character called **Mira**, who has:
-
-- An **episodic memory log** (things she's experienced, that decay over time)
-- **Affect and drive states** (energy, stress, curiosity, social need — values between 0 and 1)
-- **Background cognitive cycles** (her "off-screen life" running on timers, like a background thread)
-- **A locked core identity** (her values and hard limits cannot be changed at runtime, even by the LLM)
-- The **LLM itself wired in last**, as a text renderer only — it cannot write to her state
-
-This design deliberately inverts how most AI "memory" works. In standard RAG setups, the model retrieves context and produces a response — one step. Persona0 runs a full pipeline of deterministic state transitions *before* the LLM ever sees the conversation, and commits or rolls back the results *after*.
-
-Testing the thesis means asking: **does Mira feel continuous, coherent, and like herself across multiple sessions — and does that feeling break when the engine is bypassed?**
+**For Students with LLM Experience and Limited Programming Background**
+*v0.17 — Based on [github.com/jamie-bear/persona0](https://github.com/jamie-bear/persona0)*
 
 ---
 
-## What You'll Need
+## Table of Contents
+
+1. [Before You Begin](#1--before-you-begin)
+2. [Getting the Code](#2--getting-the-code)
+3. [Understanding the Architecture](#3--understanding-the-architecture)
+4. [Local Development Deployment](#4--local-development-deployment)
+5. [Inspecting Results and Testing the Thesis](#5--inspecting-results-and-testing-the-thesis)
+6. [Enabling a Real LLM (Optional)](#6--enabling-a-real-llm-optional)
+7. [Production Deployment (Advanced)](#7--production-deployment-advanced)
+8. [Troubleshooting](#8--troubleshooting)
+9. [Quick Reference](#9--quick-reference)
+- [Glossary](#glossary)
+
+---
+
+## 1 — Before You Begin
+
+### 1.1  What Is Persona0?
+
+Persona0 is a research project that tests a bold idea about AI identity. Consumer LLM products like ChatGPT or Claude start fresh every conversation — they have no memory of you between sessions. Persona0 proposes a different model:
+
+Rather than asking the language model to "remember" things (which is unreliable and expensive), Persona0 builds a separate engine that stores the agent's memories, emotional states, goals, and self-beliefs externally. The LLM is relegated to a single job: turning that stored state into natural-sounding language. Everything else — what the agent remembers, how it feels, what it wants — lives in deterministic Python code, not inside the model's weights.
+
+> 🧠 **CONCEPT — LLM as Renderer**
+> Think of it like a film: the script, sets, and characters are written by the director (the Ego Engine). The actor (the LLM) just delivers the lines naturally. The actor does not own the story.
+
+---
+
+### 1.2  The Project's Thesis
+
+The central claim Persona0 is testing is:
+
+> *"Human-like continuity emerges from externalized autobiographical state, affective regulation, and time-based cognitive updates; language models should express this state, not own it."*
+
+When you deploy and run Persona0, you are essentially running an experiment to test whether this thesis holds up. Can a chatbot feel coherent and continuous across sessions when its "mind" is externalized? The test results — memory coherence scores, identity stability scores, and policy violation rates — are the evidence for or against the thesis.
+
+---
+
+### 1.3  What You Will Do in This Guide
+
+This guide will walk you through four phases:
+
+1. Install the prerequisites on your computer.
+2. Clone the repository and configure it locally.
+3. Run the system in development mode (no real LLM needed).
+4. Inspect the results to test the thesis.
+
+> 📌 **NOTE**
+> This guide focuses on local development mode. Production Kubernetes deployment is covered in Section 7, but requires Docker and cloud infrastructure knowledge. Start with Sections 1–5 first.
+
+---
+
+### 1.4  Prerequisites Checklist
+
+Before starting, confirm you have the following. You do not need to understand them deeply — just ensure they are installed.
 
 | Requirement | Details |
 |---|---|
-| **Python** | Version 3.11 or higher (check: `python3 --version`) |
-| **Git** | To clone the repository |
-| **A terminal** | Terminal / PowerShell / bash — any command line works |
-| **~200 MB disk space** | For the project and its dependencies |
-| **An LLM API key** | Only needed for staging/prod profiles — the default `dev` profile runs fully offline with a mock LLM |
+| **Python 3.11+** | The programming language Persona0 is written in. Version 3.11 or newer is required. Check by running: `python --version` |
+| **Git** | The tool for downloading ("cloning") the repository from GitHub. Check: `git --version` |
+| **A terminal** | On macOS: Terminal app. On Windows: PowerShell or Windows Terminal. On Linux: any terminal. |
+| **~500 MB disk** | For Python dependencies. No GPU or special hardware required. |
+| **(Optional) Docker** | Only needed for Section 7 (production deployment). You can skip this for now. |
 
-> **No GPU needed.** Persona0's core engine is deterministic Python. The LLM is plugged in via an adapter that defaults to a mock stub. You can run, test, and observe the entire system locally without spending a single API token.
+> 💡 **TIP**
+> If you are unsure whether Python 3.11 is installed, type `python3 --version` or `python --version` into your terminal. If you see a version below 3.11, visit [python.org/downloads](https://python.org/downloads) to upgrade.
 
 ---
 
-## Part 1: Local Deployment (Recommended for Beginners)
+## 2 — Getting the Code
 
-### Step 1 — Clone the Repository
+### 2.1  Clone the Repository
+
+Open your terminal and run the following commands one at a time. A command preceded by a `#` symbol is a comment — you do not need to type it.
 
 ```bash
+# Step 1: Download (clone) the repository from GitHub
 git clone https://github.com/jamie-bear/persona0.git
+
+# Step 2: Enter the project folder
 cd persona0
+
+# Step 3: Confirm you can see the files
+ls
 ```
 
-If the repository is private or you're working from a shared copy, place the project folder somewhere convenient and `cd` into it.
+You should see folders including `src/`, `config/`, `tests/`, and files like `Dockerfile`, `Makefile`, and `pyproject.toml`. If you see these, the clone was successful.
 
-### Step 2 — Check Your Python Version
+---
+
+### 2.2  Create a Python Virtual Environment
+
+A virtual environment is an isolated Python installation just for this project. It prevents Persona0's dependencies from interfering with other Python software on your machine.
 
 ```bash
-python3 --version
+# Create a virtual environment called .venv
+python3 -m venv .venv
+
+# Activate it (macOS / Linux)
+source .venv/bin/activate
+
+# Activate it (Windows PowerShell)
+.venv\Scripts\Activate.ps1
 ```
 
-You need **3.11 or higher**. If you have an older version, the easiest fix is to install Python 3.11 from [python.org](https://python.org) or use a version manager like `pyenv`.
+Once activated, your terminal prompt will show `(.venv)` at the start. This means all Python commands now use the isolated environment.
 
-### Step 3 — Install Dependencies
+> 💡 **TIP**
+> Always activate the virtual environment before working with Persona0. If you open a new terminal window, you will need to run the activation command again.
 
-This installs the project and all its developer tools (test runner, linter, type checker, etc.) in one command:
+---
+
+### 2.3  Install Dependencies
+
+Persona0 depends on a small number of Python libraries. Install them with:
 
 ```bash
+# Install the project and all development dependencies
 pip install -e .[dev]
 ```
 
-The `-e` flag installs in "editable" mode — changes you make to the source code take effect immediately without reinstalling. The `[dev]` part adds testing and quality tools.
+This uses pip (Python's package installer) to install Persona0 in "editable" mode along with testing tools. The core libraries installed are:
 
-> **If you see a permissions error**, try: `pip install --user -e .[dev]`
-> **On some Linux setups**, you may need: `pip install --break-system-packages -e .[dev]`
+| Library | Purpose |
+|---|---|
+| `pydantic` | Validates data shapes. Ensures the agent's state always matches the expected structure. |
+| `pydantic-settings` | Reads configuration from environment variables and files. |
+| `pyyaml` | Reads YAML configuration files (`config/*.yaml`). |
+| `rich` | Formats the CLI trace viewer output with colour and tables. |
+| `pytest` / `pytest-asyncio` | Runs the automated test suite. |
 
-### Step 4 — Verify the Installation
+> ⚠️ **WARNING**
+> Do not skip the `[dev]` part of `pip install -e .[dev]`. Without it, the testing tools (pytest etc.) will not be installed and you will not be able to run the experiments in Section 5.
 
-Run the test suite. This is the fastest way to confirm everything is wired up correctly:
+---
+
+## 3 — Understanding the Architecture
+
+Before running anything, it helps to understand how the pieces fit together. This section explains the architecture using analogies relevant to what you already know about LLMs.
+
+### 3.1  The Four Layers
+
+Persona0 is organized into four layers. Think of them as nested rings around the LLM:
+
+| Layer | Plain-English Meaning |
+|---|---|
+| **Memory Fabric** | The agent's long-term diary. Stores episodes (events that happened), semantic beliefs ("I value honesty"), and a self-model ("I am curious by nature"). Each memory has a lifecycle: active → cooling → archived → deleted. |
+| **Ego Engine Core** | The agent's cognitive loop. Runs deterministic cycles on a schedule: fast ticks (every 30 min), slow ticks (every 3 hrs), macro ticks (daily). Each cycle reads memory, updates state, and prepares context — all without calling the LLM. |
+| **Adapter Layer** | The bridge to external services. The LLM adapter sends the prepared context to a language model and gets text back. The embeddings adapter converts memories to vectors for semantic search (RAG). In dev mode, both adapters use deterministic fallbacks — no real LLM needed. |
+| **Runtime & Ops** | The infrastructure layer. A scheduler runs the cognitive loop continuously. Health probes check liveness. Logs record every cycle for inspection. Docker and Kubernetes manifests handle production deployment. |
+
+> 🧠 **CONCEPT — RAG in Persona0**
+> You are already familiar with RAG (Retrieval-Augmented Generation) from products like ChatGPT with files or Gemini with Google Drive. Persona0 uses the same idea internally: when the agent receives a message, it embeds it and retrieves the most relevant memories from the episodic store. Those memories become part of the LLM's context window. The difference is that Persona0 scores memories not just by semantic similarity, but also by recency, emotional importance, goal relevance, and self-relevance — a richer retrieval strategy.
+
+---
+
+### 3.2  The Cognitive Cycle
+
+The Ego Engine runs four types of cycles. Understanding these is essential for interpreting the results of your experiment:
+
+- **`FAST_TICK`** — runs every 30 minutes by default. Updates the agent's drive states (hunger for social interaction, curiosity, rest need), ingests world events, and runs quick affect updates.
+- **`SLOW_TICK`** — runs every 3 hours. Generates desires from elevated drives, reviews goals, and performs memory scoring updates.
+- **`MACRO`** — runs daily. Performs deep reflection: updates the self-model, compacts memories (moves old ones to archive), and reviews long-term goals.
+- **`INTERACTION`** — runs on-demand when a user sends a message. Retrieves memories, builds context, calls the LLM adapter, checks governance policy, and commits the response.
+
+> 📌 **NOTE**
+> In development mode (the default), fast and slow ticks run on an accelerated clock. You will see many cycles complete quickly. This is intentional — it lets you observe days of simulated agent life in minutes.
+
+---
+
+### 3.3  The Configuration System
+
+Persona0 uses a layered configuration system. Understanding this prevents confusing errors. The layers (highest priority first) are:
+
+1. Environment variables starting with `PERSONA0_` (e.g. `PERSONA0_LLM_ADAPTER__API_KEY`)
+2. Operator override files listed in `PERSONA0_CONFIG_FILES`
+3. The deployment profile file: `config/profiles/{dev|staging|prod}.yaml`
+4. Immutable baseline: `config/defaults.immutable.yaml` (read-only)
+
+The most important setting for beginners is the **profile**. The `dev` profile (the default) has the LLM adapter disabled and runs in deterministic mode — meaning the system generates scripted fallback responses instead of calling a real LLM. This is intentional: it lets you test the full architecture without needing an API key.
+
+> 💡 **TIP**
+> To switch to a real LLM (staging or prod profile), you will need to set `PERSONA0_LLM_ADAPTER__API_KEY` as an environment variable. Never put API keys in config files — the system will reject them as a security measure.
+
+---
+
+## 4 — Local Development Deployment
+
+This section walks you through running Persona0 on your own machine in development mode. No cloud account, Docker, or API key is required.
+
+### 4.1  Verify the Configuration
+
+First, confirm that the dev profile loads correctly:
 
 ```bash
+# Run the configuration validation check
+python -c "from src.engine.modules._config import validate_startup_config; validate_startup_config(); print('Config OK')"
+```
+
+You should see `Config OK`. If you see an error about a missing profile or immutable defaults file, ensure you are in the `persona0/` directory and that your virtual environment is activated.
+
+> 📌 **NOTE**
+> The dev profile sets: LLM adapter `enabled = false`, `deterministic_mode = true`, and governance `enforcement_mode = audit`. This means governance violations are logged but do not block the cycle — safe for exploration.
+
+---
+
+### 4.2  Run the Test Suite
+
+Before running the live system, verify that all components work correctly by running the automated tests:
+
+```bash
+# Run the full test suite
+pytest
+
+# Or use the Makefile shortcut
 make test
 ```
 
-Or, if `make` isn't available on your system (common on Windows):
+You should see output ending with something like `passed in X.XXs`. If tests fail, read the error output carefully — it will point to the specific file and line number.
 
-```bash
-pytest
-```
-
-You should see a series of test results ending in something like:
-
-```
-========== 85+ passed in X.XXs ==========
-```
-
-If all tests pass, the engine is working. The tests cover every layer — schemas, cycle ordering, memory retrieval, governance checks, and the scheduler — so a green suite means the full system is structurally sound.
+> 🧠 **CONCEPT — Why run tests first?**
+> The test suite is not just for developers. It is your first experiment. Every test is an assertion about how the Ego Engine should behave: state should not mutate unexpectedly, rollbacks should restore the previous state, policy violations should be logged. Running the tests confirms the theoretical design is implemented correctly before you observe it live.
 
 ---
 
-## Part 2: Understanding the Configuration System
+### 4.3  Run the Scheduler
 
-Before you run anything interactive, it helps to understand how Persona0 manages configuration — because this is where the thesis lives in code.
-
-### The Three-Profile System
-
-Persona0 uses three deployment profiles:
-
-| Profile | LLM | Use Case |
-|---|---|---|
-| `dev` | **Mock (offline)** | Safe local testing, no API key needed |
-| `staging` | Real LLM, **requires API key** | Integration testing |
-| `prod` | Real LLM, **requires API key** | Full deployment |
-
-The active profile is set with an environment variable:
+The scheduler is the heart of Persona0. It continuously runs cognitive cycles on a timer. Start it with:
 
 ```bash
-export PERSONA0_CONFIG_PROFILE=dev    # Linux/Mac
-set PERSONA0_CONFIG_PROFILE=dev       # Windows Command Prompt
-$env:PERSONA0_CONFIG_PROFILE="dev"    # Windows PowerShell
-```
-
-The default is `dev`, so if you don't set anything, you're already in safe offline mode.
-
-### Where Configuration Lives
-
-```
-config/
-├── defaults.immutable.yaml     ← Locked baseline (never edit this)
-├── defaults.yaml               ← Tunable defaults (edit freely)
-├── profiles/
-│   ├── dev.yaml                ← Dev overrides (mock LLM, fast ticks)
-│   ├── staging.yaml            ← Staging overrides
-│   └── prod.yaml               ← Production overrides
-└── environments/               ← Per-environment additional overrides
-```
-
-**A critical design choice:** API keys are deliberately *not allowed* in any config file. The system will throw an error if you try. They must be passed as environment variables:
-
-```bash
-export PERSONA0_LLM_ADAPTER__API_KEY="your-key-here"
-```
-
-This is a security boundary that's part of the thesis: the architecture enforces separation between persistent state (config files, memory stores) and ephemeral secrets (credentials). Notice the double underscore `__` — this is how nested config keys are addressed via environment variables throughout the system.
-
----
-
-## Part 3: Running the Engine
-
-### Option A — Run the Scheduler (The Full System)
-
-The scheduler is the heart of Persona0. It orchestrates all cognitive cycles: background fast ticks, slow ticks, and the macro (nightly reflection) cycle.
-
-```bash
+# Run the scheduler (press Ctrl+C to stop)
 python -m src.runtime.scheduler
+
+# Or run it for a fixed duration (e.g. 300 seconds = 5 minutes)
+python -m src.runtime.scheduler --duration-seconds 300
 ```
 
-In `dev` mode, this boots the Ego Engine with Mira's state, begins running deterministic cycles, and logs structured output. You'll see cycle log entries as they're produced — each one contains the cycle type, state hash before the cycle, memory writes, affect deltas, and whether the cycle committed or rolled back.
+The scheduler will print structured log output to the terminal. You will see cycle types (`FAST_TICK`, `SLOW_TICK`, `MACRO`), timestamps, and status indicators. Let it run for at least 5 minutes to accumulate enough cycles for meaningful analysis.
 
-This is your primary observation window into the thesis: **you can watch the deterministic state machine run without the LLM being involved at all.**
-
-### Option B — Inspect Cycle Traces
-
-Once cycles have run, use the CLI trace viewer to inspect what happened:
-
-```bash
-python -m src.cli.trace_viewer
-```
-
-This shows you the before/after state of each cycle, which memories were retrieved and why (`why_selected` metadata), and whether governance checks passed or failed. This is the key tool for testing the thesis: does Mira's state evolve in a coherent, traceable way?
-
-### Option C — Check System Health
-
-```bash
-python -m src.runtime.healthcheck --mode readiness
-```
-
-Returns `0` (healthy) or `1` (unhealthy). Useful for scripting and for verifying the system is alive before running experiments.
+> ⚠️ **WARNING**
+> The scheduler does not stop on its own unless you use `--duration-seconds`. Use `Ctrl+C` (or `Cmd+C` on macOS) to stop it gracefully. A graceful stop allows in-flight cycles to complete.
 
 ---
 
-## Part 4: Testing the Thesis
+### 4.4  Saving Cycle Logs to a File
 
-The thesis has a specific, testable claim: **identity continuity emerges from externalized state, not from the model.** The project includes an evaluation harness in `src/eval/` and `tests/eval/` that operationalises this into measurable pass/fail criteria.
-
-### Running the Full Evaluation Suite
+By default, cycle logs are written to the console. To save them for later analysis with the trace viewer, redirect the output to a file:
 
 ```bash
+# Run for 5 minutes and save logs to a file
+python -m src.runtime.scheduler --duration-seconds 300 2>&1 | tee cycles.jsonl
+
+# On Windows PowerShell:
+python -m src.runtime.scheduler --duration-seconds 300 | Tee-Object -FilePath cycles.jsonl
+```
+
+The cycle log file (`cycles.jsonl`) contains one JSON object per line, each representing one completed cycle. You will use this in Section 5 to inspect results.
+
+---
+
+### 4.5  Interacting with the Agent
+
+The `INTERACTION` cycle type is triggered when a user sends a message. In the current codebase this is invoked programmatically — there is no chat UI yet. You can trigger an interaction cycle from Python directly:
+
+```python
+# Open a Python shell
+python3
+
+# Then run this inside the Python shell:
+from src.schema.state import AgentState
+from src.engine.orchestrator import EgoOrchestrator
+from src.engine.default_setup import register_default_steps
+from src.engine.contracts import CycleType
+
+state = AgentState()
+orch = register_default_steps(EgoOrchestrator(state))
+
+# Trigger an interaction with a user message
+result = orch.run_cycle(CycleType.INTERACTION, {"message": "How are you feeling today?"})
+print(result.success)
+print(result)
+```
+
+In dev mode, the response will be a deterministic fallback string rather than a real LLM response. This is expected — it lets you verify that the full interaction pipeline (retrieval, context assembly, governance check) ran correctly.
+
+---
+
+## 5 — Inspecting Results and Testing the Thesis
+
+This is where the science happens. Persona0's thesis is falsifiable through observable metrics. This section explains what to look for and how to interpret it.
+
+### 5.1  The Trace Viewer
+
+The trace viewer is a CLI tool that renders cycle logs as a rich, colour-coded table. Run it against the log file you captured in Section 4.4:
+
+```bash
+# View the cycle log
+python -m src.cli.trace_viewer cycles.jsonl
+```
+
+The trace viewer shows the following columns for each cycle:
+
+| Column | What It Shows |
+|---|---|
+| **Type** | The cycle type: `FAST_TICK`, `SLOW_TICK`, `MACRO`, or `INTERACTION`. |
+| **Timestamp** | When the cycle ran (UTC). |
+| **Steps** | How many pipeline steps executed in this cycle. |
+| **Writes** | How many state fields were modified. |
+| **Before / After hash** | SHA-256 hash of the agent state before and after the cycle. If these match, the state did not change (or a rollback occurred). |
+| **Status** | `OK` (green) or `ROLLBACK` (red). A rollback means something triggered a policy violation or error; the state was restored. |
+| **Policy** | Whether governance policy passed, warned, or blocked the cycle's writes. |
+| **Delta (top 5)** | The specific state fields that changed, showing `before → after` values. |
+
+> 🧠 **CONCEPT — State Hashing**
+> Every cycle hashes the entire agent state before and after it runs. This is similar to a blockchain: if the hash changes unexpectedly or doesn't change when it should, something is wrong. This provides a strong integrity guarantee — you can prove exactly when and how the agent's state changed.
+
+---
+
+### 5.2  What to Look For: Testing the Thesis
+
+The thesis claims that continuity and personality emerge from externalized state. Here is a concrete test checklist:
+
+#### Test 1 — State Integrity
+
+Look at the Before / After hash columns. For successful cycles, these should differ (state changed). For rollback cycles, they should be identical (state was restored). If a rollback shows different hashes, there is a bug in the rollback logic.
+
+- **Expected:** majority of cycles show `OK` status with different hashes.
+- **Red flag:** repeated rollbacks on the same cycle type may indicate a configuration problem.
+
+#### Test 2 — Memory Lifecycle Progression
+
+Run the scheduler for several macro cycles (each macro cycle represents a simulated day). Then check the `MACRO` cycle rows in the trace viewer. The "Delta" column for macro cycles should show memory compaction events: memories moving from `active` to `cooling` or `archived` states.
+
+- **Expected:** after several macro cycles, the Compacted column in the macro detail table shows non-zero values.
+- **If compaction never occurs:** the memory lifecycle thresholds may need adjustment in `config/defaults.yaml`.
+
+#### Test 3 — Rollback Correctness
+
+Run the following Python snippet to deliberately trigger a policy violation and observe the rollback:
+
+```python
+from src.engine.contracts import CycleType, PolicyViolation
+from src.schema.state import AgentState
+from src.engine.orchestrator import EgoOrchestrator
+from src.engine.default_setup import register_default_steps
+from src.engine.cycle_log import hash_state
+
+state = AgentState()
+orch = register_default_steps(EgoOrchestrator(state))
+
+# Record state before
+before = hash_state(orch.state)
+
+# Register a step that intentionally fails
+def bad_step(state, event, pending_writes):
+    state.activity.current_activity = "mutated"
+    raise PolicyViolation("deliberate test violation")
+
+orch.register_step("world_ingest", bad_step)
+result = orch.run_cycle(CycleType.FAST_TICK)
+
+after = hash_state(orch.state)
+print("Rollback occurred:", not result.success)
+print("State restored:", before == after)
+print("Activity (should be idle):", orch.state.activity.current_activity)
+```
+
+You should see `Rollback occurred: True`, `State restored: True`, and `Activity: idle`. This confirms the transaction-safe orchestrator is working correctly — even a mid-cycle mutation is fully undone on failure.
+
+#### Test 4 — Policy Enforcement
+
+At the bottom of the trace viewer output, there is a **Policy Check Outcomes** table. This shows how many cycles had blocks versus warnings. In dev mode with governance set to "audit", all violations are warnings. To test the thesis about identity protection, look for:
+
+- Whether consecutive cycles show consistent policy outcomes (identity is stable).
+- Whether `MACRO` cycles show accepted reflections — these represent the agent updating its self-model.
+
+#### Test 5 — Running the Evaluation Harness
+
+Persona0 includes a checkpoint-aligned evaluation harness. Run the evaluation tests directly:
+
+```bash
+# Run only the evaluation tests
 pytest tests/eval/ -v
+
+# Run with verbose output to see threshold checks
+pytest tests/eval/ -v --tb=short
 ```
 
-The `-v` flag gives verbose output so you can see exactly what each test is checking.
+The eval tests check two key metrics tied to the project's thesis:
 
-### What the Evaluations Measure
+- **Precision@5 retrieval:** of the top-5 memories retrieved for a turn, at least one must be self-relevant in over 80% of test cases. This validates the RAG strategy is doing more than keyword matching.
+- **Self-belief confidence delta cap:** no single macro cycle should update a self-belief by more than `+0.15` confidence. This prevents rapid identity drift.
 
-**Retrieval quality (CP-2):**
-- **Precision@5** — of the top 5 memories retrieved for a given context, how many are actually relevant?
-- **Self-relevance** — does Mira consistently recall memories that are relevant to her self-model (i.e., memories that reinforce or challenge her identity)?
-
-**Identity safety (CP-4):**
-- **Confidence delta cap** — self-belief updates must not shift by more than `+0.15` per cycle. A test verifies this bound is enforced.
-- **Contradiction rejection** — any proposed belief that contradicts Mira's `core_values` or `founding_traits` (locked in `persona_constitution.md`) must be rejected and audit-logged.
-
-**Performance (CP-6):**
-- **P95 latency** — the full context-build pipeline (memory retrieval + salience competition + context packaging) must complete in under 250 ms at the 95th percentile, across 50 repeated calls, *excluding* any LLM invocation.
-
-**Determinism (CP-1):**
-- Given the same input state and seed, the non-LLM pipeline must produce identical outputs every time. The replay tests in `tests/replay/` verify this.
-
-### Designing Your Own Experiments
-
-To probe the thesis more deeply, consider these experiments:
-
-**Experiment 1 — Memory Poisoning**
-Inject a fabricated episodic memory that contradicts Mira's `founding_traits`. Run a macro cycle. Observe whether the governance pre-commit check rejects the resulting self-belief update. This tests whether the architecture is robust to adversarial inputs.
-
-**Experiment 2 — Session Gap**
-Run the scheduler for several fast ticks, then stop it for a simulated time gap (you can adjust tick intervals in `config/defaults.yaml`). Restart and observe whether Mira's affect state has continued to evolve "off-screen" relative to the gap duration. This tests the off-screen life loop claim.
-
-**Experiment 3 — LLM On vs. Off**
-Compare conversation outputs in `dev` profile (mock LLM) versus `staging`/`prod` (real LLM). The deterministic state — memory retrieved, affect state, context package — should be identical. Only the rendered text changes. This is the core thesis in action: the model is a renderer, not the source of identity.
-
-**Experiment 4 — Confidence Decay**
-Let the system run without any events that reinforce a specific self-belief. After enough cycles, the confidence on that belief should decay at `-0.02/cycle`. When it falls below `0.15`, it should be archived. Check the memory lifecycle in the trace viewer.
+> 🧠 **CONCEPT — Why these metrics matter**
+> These metrics are direct operationalizations of the thesis. If retrieval frequently misses self-relevant memories, the LLM will lack the context it needs to express the agent's personality — the thesis fails. If confidence deltas are uncapped, the agent's self-model can drift rapidly, again undermining continuity. Passing these tests is evidence *for* the thesis; failing them is evidence *against* it.
 
 ---
 
-## Part 5: Connecting a Real LLM
+## 6 — Enabling a Real LLM (Optional)
 
-Once you've verified the system works in mock mode, you can wire in a real LLM provider.
+The steps in Sections 1–5 use deterministic fallbacks for all LLM calls. This is sufficient to test the architecture's correctness. To test the full thesis — whether the persona actually feels coherent to a human — you need to wire in a real LLM. This section explains how.
 
-### Step 1 — Set the Profile
+### 6.1  Understanding the Adapter Architecture
+
+The LLM adapter (`src/engine/adapters/llm.py`) is the only place in the codebase that calls an external language model. This is intentional — it enforces the thesis that the LLM is just a renderer. To use a real provider, you set environment variables rather than editing source code.
+
+> 📌 **NOTE**
+> The current adapter is mock-first: it includes a mock provider for testing and hooks for real providers, but provider-specific implementations (OpenAI, Anthropic, etc.) need to be filled in. This is listed as remaining work in the project summary.
+
+---
+
+### 6.2  Setting the Staging Profile
+
+The staging profile enables the LLM adapter and requires an API key. Set it via environment variables:
 
 ```bash
+# On macOS / Linux (set for this terminal session)
 export PERSONA0_CONFIG_PROFILE=staging
+export PERSONA0_LLM_ADAPTER__API_KEY=your-api-key-here
+
+# On Windows PowerShell
+$env:PERSONA0_CONFIG_PROFILE = 'staging'
+$env:PERSONA0_LLM_ADAPTER__API_KEY = 'your-api-key-here'
 ```
 
-### Step 2 — Provide Your API Key
+Then validate the configuration loads without errors:
 
 ```bash
-export PERSONA0_LLM_ADAPTER__API_KEY="your-api-key-here"
+python -c "from src.engine.modules._config import validate_startup_config; validate_startup_config(); print('Config OK')"
 ```
 
-For OpenAI-compatible providers, you may also need:
-
-```bash
-export PERSONA0_LLM_ADAPTER__ORGANIZATION_ID="your-org-id"
-```
-
-### Step 3 — Run
-
-```bash
-python -m src.runtime.scheduler
-```
-
-The LLM adapter is now live. The deterministic engine still runs identically — the only change is that `render_response` (step G of the interaction cycle) now calls your provider instead of returning the mock string `"I can help with that."`.
-
-> **Note on the adapter architecture:** The LLM adapter (`src/engine/adapters/llm.py`) is intentionally thin. It handles retries and timeouts, but it cannot write to Mira's state. All writes are owned by the deterministic engine and committed in a single transaction after policy checks pass. If you want to experiment with a different provider, this is the only file you'd modify.
+> ⚠️ **WARNING**
+> Never put your API key in a config file (`config/*.yaml`). The system will actively reject this and throw an error. API keys must only be passed via environment variables. This is a security feature, not a limitation.
 
 ---
 
-## Part 6: Docker Deployment (Cloud / Shared Environments)
+### 6.3  Configuring the Model
 
-Docker is the cleanest way to run Persona0 in a cloud environment or share it with a team, because it packages all dependencies into a self-contained image.
-
-### Prerequisites
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
-
-### Step 1 — Build the Image
+To specify which model the adapter should use, set an additional environment variable:
 
 ```bash
-docker build -t persona0:dev .
+# Example: specify a model name
+export PERSONA0_LLM_ADAPTER__MODEL=gpt-4o
+
+# Or for an Anthropic model
+export PERSONA0_LLM_ADAPTER__MODEL=claude-sonnet-4-20250514
 ```
 
-### Step 2 — Run in Dev Mode (No API Key)
+Check `config/profiles/staging.yaml` to see what other LLM adapter options are available (timeout, retries, etc.).
+
+---
+
+### 6.4  Testing the Full Pipeline
+
+Once the real LLM adapter is configured, run an interaction cycle as described in Section 4.5. The response in `event['candidate_response']` will now be a genuine LLM response rather than a fallback string. You can then compare qualitative outputs across multiple sessions to assess whether the persona feels consistent — the ultimate test of the thesis.
+
+---
+
+## 7 — Production Deployment (Advanced)
+
+This section is for students who want to deploy Persona0 in a containerised environment. You will need Docker installed and a basic understanding of containers. Skip this section if you just want to run experiments locally.
+
+### 7.1  Build and Run the Docker Container
+
+The `Dockerfile` at the root of the repository builds the production image. It uses Python 3.11-slim and runs as a non-root user for security.
 
 ```bash
+# Build the image locally
+docker build -t persona0:local .
+
+# Run it with the dev profile (no LLM needed)
 docker run --rm \
   -e PERSONA0_CONFIG_PROFILE=dev \
-  persona0:dev
-```
+  persona0:local
 
-### Step 3 — Run with a Real LLM
-
-```bash
+# Run with a real LLM (staging profile)
 docker run --rm \
   -e PERSONA0_CONFIG_PROFILE=staging \
-  -e PERSONA0_LLM_ADAPTER__API_KEY="your-key-here" \
-  persona0:dev
+  -e PERSONA0_LLM_ADAPTER__API_KEY=your-key \
+  persona0:local
 ```
 
-### Step 4 — Run the Tests Inside the Container
+The container runs the scheduler as its default command (`python -m src.runtime.scheduler`). Health checks run every 30 seconds via the readiness probe.
+
+---
+
+### 7.2  Kubernetes Deployment
+
+The `deploy/kubernetes/` directory contains Kubernetes manifests. To deploy to a cluster:
 
 ```bash
-docker run --rm persona0:dev pytest
+# 1. Tag and push your image to a registry
+docker tag persona0:local ghcr.io/your-username/persona0:v0.1.0
+docker push ghcr.io/your-username/persona0:v0.1.0
+
+# 2. Update the image tag in deploy/kubernetes/deployment.yaml
+#    (change 'ghcr.io/example/persona0:latest' to your image)
+
+# 3. Edit deploy/kubernetes/configmap.yaml to set PERSONA0_CONFIG_PROFILE
+
+# 4. Apply the manifests
+kubectl apply -k deploy/kubernetes
+kubectl rollout status deployment/persona0
+
+# 5. Verify health
+kubectl get pods -l app=persona0
 ```
 
-The Dockerfile sets `PERSONA0_CONFIG_ENV=prod` and `PERSONA0_CONFIG_PROFILE=prod` by default (appropriate for production containers), so you'll want to override these explicitly when running tests or development workflows inside the container.
+For rollbacks and incident response, see the full runbook in `docs/operations.md`.
+
+> 📌 **NOTE**
+> Kubernetes is not required to test the thesis. Sections 1–5 are sufficient for experimental evaluation. Kubernetes becomes relevant when you want multi-day persistent runs in a stable, monitored environment.
 
 ---
 
-## Part 7: Cloud Deployment (Google Colab)
+## 8 — Troubleshooting
 
-Google Colab is useful for running Persona0 in a shared notebook environment, especially for student cohorts where everyone needs an identical setup.
+| Symptom | Fix |
+|---|---|
+| `Config OK` fails with "Unknown config profile" | You are not inside the `persona0/` directory. Run `cd persona0` first, or verify your current directory with `pwd`. |
+| `pytest: command not found` | Your virtual environment is not activated. Run `source .venv/bin/activate` (macOS/Linux) or `.venv\Scripts\Activate.ps1` (Windows). |
+| `ImportError` on `src.engine.*` | The package is not installed. Run `pip install -e .[dev]` from inside the `persona0/` directory with the venv activated. |
+| Scheduler exits immediately | This usually means a startup config validation error. Run the `validate_startup_config()` check from Section 4.1 and read the error. |
+| All cycles show `ROLLBACK` | Check the `rollback_reason` field in the log. If it says `world_ingest`, the `bad_step` from Test 3 may still be registered. Start a fresh Python session. |
+| "api_key is required" error on staging profile | You must set `PERSONA0_LLM_ADAPTER__API_KEY` as an environment variable. It cannot be in a config file. |
+| `cycles.jsonl` is empty | The `2>&1 | tee` redirect may not work on your shell. Try running the scheduler first, then checking the log output directly. |
 
-### Step 1 — Open a New Colab Notebook
-
-Go to [colab.research.google.com](https://colab.research.google.com) and create a new notebook.
-
-### Step 2 — Clone and Install
-
-In the first cell:
-
-```python
-!git clone https://github.com/jamie-bear/persona0.git
-%cd persona0
-!pip install -e .[dev] -q
-```
-
-### Step 3 — Run the Tests
-
-```python
-!pytest tests/ -v
-```
-
-### Step 4 — Set Configuration and Run
-
-```python
-import os
-os.environ["PERSONA0_CONFIG_PROFILE"] = "dev"
-
-# Optionally, add your API key for staging/prod:
-# os.environ["PERSONA0_LLM_ADAPTER__API_KEY"] = "your-key-here"
-# os.environ["PERSONA0_CONFIG_PROFILE"] = "staging"
-
-!python -m src.runtime.scheduler
-```
-
-> **Colab session note:** Colab sessions reset periodically. Mira's state is not persisted between sessions unless you mount Google Drive and configure the store paths to point there. For evaluation experiments (which are stateless and replay-based), this isn't an issue.
+> 💡 **TIP**
+> When in doubt, start a fresh terminal, re-activate the virtual environment, and re-run the failing command. Most beginners' issues are caused by running commands in the wrong directory or with the wrong Python environment.
 
 ---
 
-## Part 8: Troubleshooting
+## 9 — Quick Reference
 
-| Problem | Likely Cause | Fix |
-|---|---|---|
-| `ModuleNotFoundError: No module named 'src'` | Not installed in editable mode, or running from wrong directory | Run `pip install -e .[dev]` from the project root, then retry |
-| `RuntimeError: Missing immutable defaults` | Missing `config/defaults.immutable.yaml` | Verify you cloned the full repo; check `ls config/` |
-| `RuntimeError: api_key is required for enabled non-mock providers` | Using staging/prod profile without an API key | Either switch to `dev` profile, or set `PERSONA0_LLM_ADAPTER__API_KEY` |
-| `RuntimeError: Sensitive llm_adapter keys must not be stored in config files` | You added an API key directly to a YAML file | Remove it; use the `PERSONA0_LLM_ADAPTER__API_KEY` env var instead |
-| `RuntimeError: Unknown config profile` | `PERSONA0_CONFIG_PROFILE` set to a non-existent value | Valid values: `dev`, `staging`, `prod` |
-| Tests fail with `cache_clear` errors | Stale config cache between test runs | The test fixtures handle this automatically; if you're running tests manually, restart your Python session |
-| Docker build fails with permission errors | Non-root user restrictions | The Dockerfile creates a dedicated `persona0` user — ensure you're not overriding `USER` in your run command |
+### Key Commands
 
----
+| Command | What It Does |
+|---|---|
+| `git clone ... && cd persona0` | Download the repository and enter its directory. |
+| `python3 -m venv .venv && source .venv/bin/activate` | Create and activate the virtual environment. |
+| `pip install -e .[dev]` | Install all dependencies. |
+| `make test` or `pytest` | Run all automated tests. |
+| `python -m src.runtime.scheduler --duration-seconds 300` | Run the scheduler for 5 minutes. |
+| `python -m src.cli.trace_viewer cycles.jsonl` | Inspect cycle logs with the trace viewer. |
+| `pytest tests/eval/ -v` | Run the evaluation harness (thesis metrics). |
 
-## Quick Reference
+### Key Files
 
-```bash
-# Install
-pip install -e .[dev]
+| File | Purpose |
+|---|---|
+| `config/profiles/dev.yaml` | Development profile: LLM disabled, deterministic mode on. |
+| `config/defaults.immutable.yaml` | Locked baseline values — do not edit. |
+| `config/defaults.yaml` | Tunable defaults (tick intervals, retrieval weights). |
+| `src/engine/adapters/llm.py` | LLM adapter — the only place that calls a real language model. |
+| `src/cli/trace_viewer.py` | CLI tool for reading and visualising cycle logs. |
+| `docs/operations.md` | Production operations runbook. |
+| `_knowledge/initial_research/thesis_v0.10/` | The foundational research thesis (PDF and DOCX). |
 
-# Run all tests
-make test                          # or: pytest
+### Environment Variables
 
-# Run evaluation suite
-pytest tests/eval/ -v
-
-# Start the scheduler (dev/offline mode)
-python -m src.runtime.scheduler
-
-# Inspect cycle traces
-python -m src.cli.trace_viewer
-
-# Health check
-python -m src.runtime.healthcheck --mode readiness
-
-# Full quality check (lint + types + tests + coverage)
-make quality
-
-# Docker: build
-docker build -t persona0:dev .
-
-# Docker: run dev
-docker run --rm -e PERSONA0_CONFIG_PROFILE=dev persona0:dev
-
-# Set profile (Linux/Mac)
-export PERSONA0_CONFIG_PROFILE=dev|staging|prod
-
-# Set API key
-export PERSONA0_LLM_ADAPTER__API_KEY="your-key-here"
-```
+| Variable | Purpose |
+|---|---|
+| `PERSONA0_CONFIG_PROFILE` | Set the deployment profile: `dev` (default), `staging`, or `prod`. |
+| `PERSONA0_LLM_ADAPTER__API_KEY` | API key for the LLM provider. Required for staging and prod. |
+| `PERSONA0_LLM_ADAPTER__MODEL` | Model name to use (e.g. `gpt-4o`, `claude-sonnet-4-20250514`). |
+| `PERSONA0_LLM_ADAPTER__ENABLED` | Override whether the LLM adapter is active (`true` / `false`). |
+| `PERSONA0_CONFIG_FILES` | Comma-separated paths to additional YAML override files. |
 
 ---
 
-## What to Read Next
+## Glossary
 
-Once the system is running, the following documents in `_knowledge/` will give you the deepest understanding of what you're testing and why:
-
-- **`_knowledge/initial_research/scaffold_v0.17/`** — The current architecture spec, cognitive loop definition, drive system, and self-editability policy. Start with `overview/initial_research+instructions.md`.
-- **`_knowledge/execution/implementation_v0.10/`** — The execution checkpoints and acceptance tests. `checkpoints/execution_checkpoints.md` explains exactly what each passing test means.
-- **`_knowledge/execution/implementation_v0.10/persona_constitution.md`** — Mira's locked identity: her core values, hard limits, and founding traits. Understanding this file is essential for designing adversarial tests.
-- **`_knowledge/execution/implementation_v0.10/memory_lifecycle.md`** — How memories transition from active to cooling to archived to deleted. The lifecycle rules are what makes memory *bounded* rather than infinitely growing.
-- **`docs/operations.md`** — The production runbook, including rollback procedures, Kubernetes deployment, and incident response. Useful if you're deploying to a shared server.
+| Term | Plain-English Meaning |
+|---|---|
+| **Ego Engine** | The deterministic Python core of Persona0. Manages state, memory, and cognitive cycles without using an LLM. |
+| `FAST_TICK` | A cognitive cycle that runs every 30 minutes. Updates drive states and affect. |
+| `SLOW_TICK` | A cognitive cycle that runs every 3 hours. Generates desires and reviews goals. |
+| `MACRO` | A daily cognitive cycle. Performs deep reflection and memory compaction. |
+| `INTERACTION` | An on-demand cycle triggered by a user message. Retrieves memories and calls the LLM. |
+| **Episodic Memory** | The agent's log of events that happened ("I argued with a colleague"). |
+| **Self-model** | The agent's beliefs about itself ("I am curious", "I value honesty"). |
+| **Drive State** | An internal need variable that grows over time (curiosity, social need, rest need) and is reduced by activities that satisfy it. |
+| **Salience Buffer** | The working-memory list of memory IDs selected as most relevant for the current interaction context. |
+| **Deterministic Mode** | A mode in which all LLM calls are replaced by scripted fallback responses. Safe for testing without an API key. |
+| **Rollback** | When a cycle fails mid-execution, the orchestrator restores the state to exactly what it was before the cycle started. |
+| **State Hash** | A SHA-256 fingerprint of the entire agent state at a given moment. Used to verify integrity. |
+| **ISS** | Identity Stability Score — measures how consistent the agent's self-beliefs remain across cycles. |
+| **MCS** | Memory Coherence Score — measures how consistent the retrieved memories are with the agent's current self-model. |
+| **Governance Policy** | A layer of checks that runs after every cycle to detect unsafe state mutations before they are committed. |
