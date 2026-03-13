@@ -1,0 +1,265 @@
+{
+  "name": "Persona0 — Interaction Cycle",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "persona0-interact",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [220, 300],
+      "webhookId": "persona0-interact"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 1: INGEST_TURN — receive user message and load current agent state\nconst input = $input.first().json;\nconst userMessage = input.body?.message || input.message || '';\nconst sessionId = input.body?.session_id || input.session_id || 'default';\n\n// Load persisted state (in production, fetch from your DB/file store)\n// For now, use n8n static data or the state passed in the request\nlet state = input.body?.state || $getWorkflowStaticData('global').agentState;\n\nif (!state) {\n  // Bootstrap fresh state — see config/persona_config.json\n  state = {\n    persona: { name: 'MyPersona', core_values: ['honesty', 'curiosity'], hard_limits: [], founding_traits: [] },\n    affect: { valence: 0.10, arousal: 0.30, stress: 0.10, energy: 0.70 },\n    drives: { social_need: 0.20, mastery_need: 0.15, rest_need: 0.10, curiosity: 0.30 },\n    self_model: { beliefs: [] },\n    goals: [],\n    activity: { current_activity: 'idle' },\n    attention: { current_focus: null, salience_buffer: [] },\n    active_desires: [],\n    persisted_desires: [],\n    consecutive_thought_categories: [],\n    safety: { disclosure_last_shown_at: null },\n    state_schema_version: '0.1',\n    tick_counter: 0\n  };\n}\n\nreturn [{\n  json: {\n    state,\n    user_message: userMessage,\n    session_id: sessionId,\n    cycle_id: `interaction-${Date.now()}`,\n    cycle_type: 'interaction',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Ingest Turn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 2: PARSE_INTENT_AFFECT — basic intent and affect parsing from user message\nconst item = $input.first().json;\nconst message = item.user_message || '';\nconst lower = message.toLowerCase();\n\n// Simple rule-based intent detection (replace with LLM in production)\nlet intent = 'general';\nif (lower.includes('?') || lower.startsWith('what') || lower.startsWith('how') || lower.startsWith('why')) {\n  intent = 'question';\n} else if (lower.includes('help') || lower.includes('please')) {\n  intent = 'request';\n} else if (lower.includes('thank') || lower.includes('great') || lower.includes('awesome')) {\n  intent = 'positive_feedback';\n} else if (lower.includes('bye') || lower.includes('goodbye')) {\n  intent = 'farewell';\n}\n\n// Estimate affect cues from message\nlet sentimentEstimate = 0.0;\nconst positiveWords = ['happy', 'great', 'good', 'love', 'wonderful', 'thanks', 'awesome'];\nconst negativeWords = ['sad', 'angry', 'frustrated', 'hate', 'terrible', 'bad', 'upset'];\n\nfor (const w of positiveWords) if (lower.includes(w)) sentimentEstimate += 0.2;\nfor (const w of negativeWords) if (lower.includes(w)) sentimentEstimate -= 0.2;\nsentimentEstimate = Math.max(-1, Math.min(1, sentimentEstimate));\n\nreturn [{\n  json: {\n    ...item,\n    intent,\n    sentiment_estimate: sentimentEstimate,\n    appraisals: [{\n      goal_congruence: sentimentEstimate > 0 ? sentimentEstimate * 0.5 : 0,\n      threat: sentimentEstimate < -0.3 ? Math.abs(sentimentEstimate) * 0.3 : 0,\n      arousal_cue: Math.abs(sentimentEstimate) * 0.3\n    }]\n  }\n}];"
+      },
+      "name": "Parse Intent & Affect",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 3: RETRIEVE_MEMORY_CANDIDATES — hybrid ranked retrieval\n// In production, this queries your vector store for semantic matches.\n// For this template, we simulate with episodic log entries.\n\nconst item = $input.first().json;\nconst state = item.state;\n\n// In production: call your vector store (Pinecone, Chroma, pgvector) via HTTP Request node\n// and pass results here. For now, we work with any memories passed in state or static data.\nconst episodicLog = $getWorkflowStaticData('global').episodicLog || [];\n\n// Retrieval weights (from config/defaults.yaml)\nconst weights = {\n  similarity: 0.30,\n  recency: 0.30,\n  importance: 0.25,\n  self_relevance: 0.15\n};\nconst minImportance = 0.15;\nconst candidateLimit = 20;\n\n// Score and rank\nconst ranked = [];\nfor (const record of episodicLog) {\n  const importance = record.importance || 0;\n  if (importance < minImportance) continue;\n  \n  const score = \n    weights.similarity * (record.similarity || 0) +\n    weights.recency * (record.recency || 0) +\n    weights.importance * importance +\n    weights.self_relevance * (record.self_relevance || 0);\n  \n  ranked.push({ ...record, hybrid_score: score });\n}\n\nranked.sort((a, b) => b.hybrid_score - a.hybrid_score);\nconst candidates = ranked.slice(0, candidateLimit);\n\nreturn [{\n  json: {\n    ...item,\n    memory_candidates: candidates\n  }\n}];"
+      },
+      "name": "Retrieve Memory Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 4: SALIENCE_COMPETITION — select top-5 for context package\nconst item = $input.first().json;\nconst candidates = item.memory_candidates || [];\nconst salienceCapacity = 5;\n\nconst salientMemories = candidates.slice(0, salienceCapacity);\n\nconst state = { ...item.state };\nstate.attention = {\n  current_focus: item.user_message ? 'user_interaction' : null,\n  salience_buffer: salientMemories.map(m => m.id || 'unknown')\n};\n\nreturn [{\n  json: {\n    ...item,\n    state,\n    salient_memories: salientMemories\n  }\n}];"
+      },
+      "name": "Salience Competition",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 5: APPRAISAL_UPDATE — update affect based on interaction appraisals\nconst item = $input.first().json;\nconst state = item.state;\nconst appraisals = item.appraisals || [];\n\nfunction ema(value, baseline, rate) {\n  return value + (baseline - value) * rate;\n}\nfunction clamp(v, lo = -1, hi = 1) {\n  return Math.max(lo, Math.min(hi, v));\n}\n\nconst baseline = { valence: 0.10, arousal: 0.30, stress: 0.10, energy: 0.70 };\nconst decay = { valence: 0.05, arousal: 0.08, stress: 0.06, energy: 0.04 };\n\nlet { valence, arousal, stress, energy } = state.affect;\n\n// EMA decay\nvalence = ema(valence, baseline.valence, decay.valence);\narousal = ema(arousal, baseline.arousal, decay.arousal);\nstress = ema(stress, baseline.stress, decay.stress);\nenergy = ema(energy, baseline.energy, decay.energy);\n\n// Appraisal deltas\nfor (const a of appraisals) {\n  valence += (a.goal_congruence || 0) * 0.10;\n  stress += (a.threat || 0) * 0.10;\n  arousal += (a.arousal_cue || 0) * 0.05;\n}\n\nstate.affect = {\n  valence: clamp(valence),\n  arousal: clamp(arousal),\n  stress: clamp(stress),\n  energy: clamp(energy)\n};\n\nreturn [{ json: { ...item, state } }];"
+      },
+      "name": "Appraisal Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 6: BUILD_CONTEXT_PACKAGE — assemble the prompt context for the LLM\nconst item = $input.first().json;\nconst state = item.state;\nconst salientMemories = item.salient_memories || [];\n\n// Build the context that will be sent to the LLM\nconst contextPackage = {\n  // Persona identity\n  persona_name: state.persona.name,\n  core_values: state.persona.core_values,\n  voice_style: state.persona.voice_style,\n  \n  // Current affect (emotional tone)\n  current_affect: state.affect,\n  \n  // Active goals for context\n  active_goals: (state.goals || []).filter(g => g.status === 'active').map(g => g.label),\n  \n  // Self-beliefs for personality consistency\n  self_beliefs: (state.self_model.beliefs || [])\n    .filter(b => b.confidence > 0.4)\n    .map(b => b.statement),\n  \n  // Relevant memories\n  relevant_memories: salientMemories.map(m => m.text || m.content || JSON.stringify(m)),\n  \n  // User message\n  user_message: item.user_message,\n  intent: item.intent,\n  \n  // Current activity\n  current_activity: state.activity.current_activity\n};\n\nreturn [{ json: { ...item, context_package: contextPackage } }];"
+      },
+      "name": "Build Context Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 7: RENDER_RESPONSE — prepare the LLM prompt\n// This node builds the system + user prompt. The actual LLM call\n// happens in the next node (AI Agent or HTTP Request).\n\nconst item = $input.first().json;\nconst ctx = item.context_package;\n\nconst systemPrompt = `You are ${ctx.persona_name || 'a thoughtful persona'}.\n\nCore values: ${(ctx.core_values || []).join(', ')}\nVoice style: ${JSON.stringify(ctx.voice_style || {})}\n\nCurrent emotional state:\n- Valence (mood): ${ctx.current_affect?.valence?.toFixed(2) || '0.10'}\n- Arousal (energy): ${ctx.current_affect?.arousal?.toFixed(2) || '0.30'}\n- Stress: ${ctx.current_affect?.stress?.toFixed(2) || '0.10'}\n- Energy: ${ctx.current_affect?.energy?.toFixed(2) || '0.70'}\n\nSelf-beliefs:\n${(ctx.self_beliefs || []).map(b => '- ' + b).join('\\n') || '(none yet)'}\n\nActive goals:\n${(ctx.active_goals || []).map(g => '- ' + g).join('\\n') || '(none)'}\n\nRelevant memories:\n${(ctx.relevant_memories || []).map(m => '- ' + m).join('\\n') || '(no relevant memories)'}\n\nCurrent activity: ${ctx.current_activity || 'idle'}\n\nRespond naturally and authentically, consistent with your personality, current mood, and values. Keep responses conversational and genuine.`;\n\nreturn [{\n  json: {\n    ...item,\n    system_prompt: systemPrompt,\n    user_prompt: ctx.user_message\n  }\n}];"
+      },
+      "name": "Render Response Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.llm_endpoint || 'https://api.openai.com/v1/chat/completions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.httpHeaderAuth?.value || 'YOUR_API_KEY' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: $json.system_prompt }, { role: 'user', content: $json.user_prompt }], max_tokens: 1024, temperature: 0.7 }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "LLM API Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1980, 300],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "DISABLED by default — enable after setting up LLM credentials. Or replace with n8n AI Agent node."
+    },
+    {
+      "parameters": {
+        "jsCode": "// FALLBACK: Mock LLM response for testing without API credentials\n// Remove this node and enable the LLM API Call node when ready for production.\n\nconst item = $input.first().json;\nconst message = item.user_prompt || '';\nconst persona = item.state?.persona?.name || 'Persona';\n\n// Simple template responses for testing\nlet response;\nif (item.intent === 'question') {\n  response = `That's a thoughtful question. Let me think about that... I'd say it connects to what I've been reflecting on lately.`;\n} else if (item.intent === 'farewell') {\n  response = `Take care! It was good connecting with you. I'll be here whenever you'd like to chat again.`;\n} else if (item.intent === 'positive_feedback') {\n  response = `That means a lot, thank you! Moments like this remind me why I value genuine connection.`;\n} else {\n  response = `I hear you. ${message.length > 50 ? 'That gives me a lot to think about.' : 'Tell me more about what\\'s on your mind.'}  I'm in a ${item.state?.affect?.valence > 0.3 ? 'reflective and positive' : 'thoughtful'} mood right now.`;\n}\n\nreturn [{\n  json: {\n    ...item,\n    candidate_text: response,\n    llm_provider: 'mock'\n  }\n}];"
+      },
+      "name": "Mock LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 8: POLICY_AND_CONSISTENCY_CHECK — governance validation\nconst item = $input.first().json;\nconst state = item.state;\nconst candidateText = item.candidate_text || '';\n\n// Hard limit check\nconst hardLimits = state.persona.hard_limits || [];\nlet blocked = false;\nconst outcomes = [];\n\nfor (const limit of hardLimits) {\n  if (limit && candidateText.toLowerCase().includes(limit.toLowerCase())) {\n    outcomes.push({ category: 'hard_limit_breach', severity: 'block', reason: `Matches: ${limit}` });\n    blocked = true;\n  }\n}\n\n// Value consistency check\nfor (const value of state.persona.core_values || []) {\n  if (value && candidateText.toLowerCase().includes(`not ${value.toLowerCase()}`)) {\n    outcomes.push({ category: 'value_contradiction', severity: 'warn', reason: `May contradict: ${value}` });\n  }\n}\n\nif (!blocked && outcomes.length === 0) {\n  outcomes.push({ category: 'pass', severity: 'info', reason: 'All checks passed' });\n}\n\nreturn [{\n  json: {\n    ...item,\n    governance: {\n      passed: !blocked,\n      outcomes,\n      summary: { passed: !blocked, blocked: blocked ? 1 : 0, warnings: outcomes.filter(o => o.severity === 'warn').length }\n    }\n  }\n}];"
+      },
+      "name": "Policy Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 9: COMMIT_OR_ROLLBACK — persist state changes or rollback\nconst item = $input.first().json;\nconst state = item.state;\nconst governance = item.governance || { passed: true };\n\nlet finalResponse;\nlet committed = false;\n\nif (governance.passed) {\n  // Commit: persist updated state\n  finalResponse = item.candidate_text;\n  committed = true;\n  \n  // Record this interaction as an episodic event\n  const episodicLog = $getWorkflowStaticData('global').episodicLog || [];\n  episodicLog.push({\n    id: `ep-${Date.now()}`,\n    type: 'user_interaction',\n    text: `User: ${item.user_message}\\nResponse: ${finalResponse}`,\n    importance: 0.5,\n    similarity: 0,\n    recency: 1.0,\n    self_relevance: 0.3,\n    created_at: new Date().toISOString(),\n    lifecycle_state: 'active',\n    affect_snapshot: { ...state.affect },\n    drive_snapshot: { ...state.drives }\n  });\n  \n  // Keep only last 100 episodic entries\n  if (episodicLog.length > 100) episodicLog.splice(0, episodicLog.length - 100);\n  \n  $getWorkflowStaticData('global').episodicLog = episodicLog;\n  \n  // Update drive satisfaction (conversation satisfies social_need)\n  const socialReduction = 0.25;\n  state.drives.social_need = Math.max(0, state.drives.social_need - socialReduction);\n  \n  // Persist state\n  $getWorkflowStaticData('global').agentState = state;\n} else {\n  // Rollback: return safe fallback\n  finalResponse = \"I need to think about that differently. Let me try again.\";\n}\n\n// Clear ephemeral fields\nstate.attention = { current_focus: null, salience_buffer: [] };\nstate.active_desires = [];\n\nreturn [{\n  json: {\n    response: finalResponse,\n    session_id: item.session_id,\n    cycle_id: item.cycle_id,\n    committed,\n    governance_summary: governance.summary || {},\n    affect: state.affect,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Commit or Rollback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ingest Turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Turn": {
+      "main": [
+        [
+          {
+            "node": "Parse Intent & Affect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Intent & Affect": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Memory Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Memory Candidates": {
+      "main": [
+        [
+          {
+            "node": "Salience Competition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salience Competition": {
+      "main": [
+        [
+          {
+            "node": "Appraisal Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Appraisal Update": {
+      "main": [
+        [
+          {
+            "node": "Build Context Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Context Package": {
+      "main": [
+        [
+          {
+            "node": "Render Response Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Response Prompt": {
+      "main": [
+        [
+          {
+            "node": "Mock LLM Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock LLM Response": {
+      "main": [
+        [
+          {
+            "node": "Policy Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Policy Check": {
+      "main": [
+        [
+          {
+            "node": "Commit or Rollback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "persona0-interaction"
+  },
+  "tags": [
+    {
+      "name": "persona0"
+    },
+    {
+      "name": "interaction"
+    }
+  ]
+}
