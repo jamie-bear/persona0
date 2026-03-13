@@ -411,23 +411,34 @@ The steps in Sections 1–5 use deterministic fallbacks for all LLM calls. This 
 
 The LLM adapter (`src/engine/adapters/llm.py`) is the only place in the codebase that calls an external language model. This is intentional — it enforces the thesis that the LLM is just a renderer. To use a real provider, you set environment variables rather than editing source code.
 
-> 📌 **NOTE**
-> The current adapter is mock-first: it includes a mock provider for testing and hooks for real providers, but provider-specific implementations (OpenAI, Anthropic, etc.) need to be filled in. This is listed as remaining work in the project summary.
+The adapter supports three providers out of the box:
+
+| Provider | `PERSONA0_LLM_ADAPTER__PROVIDER` value | API key env var |
+|----------|----------------------------------------|----------------|
+| Mock (default) | `mock` | None required |
+| OpenAI | `openai` | `OPENAI_API_KEY` |
+| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` |
+
+All real providers include exponential back-off retry logic, token-bucket rate limiting, and optional streaming responses.
 
 ---
 
 ### 6.2  Setting the Staging Profile
 
-The staging profile enables the LLM adapter and requires an API key. Set it via environment variables:
+The staging profile enables the LLM adapter and requires an API key. Set all required variables for your chosen provider:
 
 ```bash
-# On macOS / Linux (set for this terminal session)
+# OpenAI — macOS / Linux
 export PERSONA0_CONFIG_PROFILE=staging
-export PERSONA0_LLM_ADAPTER__API_KEY=your-api-key-here
+export PERSONA0_LLM_ADAPTER__PROVIDER=openai
+export OPENAI_API_KEY=your-openai-key-here
 
-# On Windows PowerShell
-$env:PERSONA0_CONFIG_PROFILE = 'staging'
-$env:PERSONA0_LLM_ADAPTER__API_KEY = 'your-api-key-here'
+# Anthropic — macOS / Linux
+export PERSONA0_CONFIG_PROFILE=staging
+export PERSONA0_LLM_ADAPTER__PROVIDER=anthropic
+export ANTHROPIC_API_KEY=your-anthropic-key-here
+
+# Windows PowerShell equivalents (replace export with $env:VARIABLE = 'value')
 ```
 
 Then validate the configuration loads without errors:
@@ -441,19 +452,28 @@ python -c "from src.engine.modules._config import validate_startup_config; valid
 
 ---
 
-### 6.3  Configuring the Model
+### 6.3  Configuring the Model and Options
 
-To specify which model the adapter should use, set an additional environment variable:
+Specify the model and optional behaviour with environment variables:
 
 ```bash
-# Example: specify a model name
+# OpenAI
 export PERSONA0_LLM_ADAPTER__MODEL=gpt-4o
 
-# Or for an Anthropic model
+# Anthropic
 export PERSONA0_LLM_ADAPTER__MODEL=claude-sonnet-4-20250514
+
+# Enable streaming (lower time-to-first-token)
+export PERSONA0_LLM_ADAPTER__STREAMING=true
+
+# Adjust rate limit (requests per minute) if your tier allows more
+export PERSONA0_LLM_ADAPTER__RATE_LIMIT_RPM=120
 ```
 
-Check `config/profiles/staging.yaml` to see what other LLM adapter options are available (timeout, retries, etc.).
+Check `config/profiles/staging.yaml` for the full list of LLM adapter options (timeout, retries, etc.).
+
+> 📌 **NOTE**
+> The adapter requires `openai` (pip install openai) or `anthropic` (pip install anthropic) to be installed for their respective providers. Both are optional dependencies — they are not installed by the default `pip install -e .[dev]` command. Install only the one you intend to use.
 
 ---
 
@@ -491,12 +511,46 @@ The container runs the scheduler as its default command (`python -m src.runtime.
 
 ---
 
-### 7.2  Kubernetes Deployment
+### 7.2  Production Vector Store (pgvector)
+
+The default in-memory vector store loses all embeddings on restart. For persistent semantic memory search in production, use the `PgVectorStore` backed by PostgreSQL with the pgvector extension.
+
+**Prerequisites:**
+
+```bash
+# Install the Python drivers
+pip install "psycopg[binary]" pgvector
+
+# On your PostgreSQL server (run once per database)
+psql -d persona0 -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+**Configure the connection:**
+
+```bash
+export PERSONA0_PGVECTOR_DSN="postgresql://user:password@localhost:5432/persona0"
+```
+
+The store creates its table (`persona0_vectors`) and indexes automatically on first use. It supports:
+- **Batch upserts** — load existing episodic records in bulk at startup
+- **IVFFlat cosine similarity index** — efficient approximate nearest-neighbour search
+- **GIN metadata index** — fast filtering by lifecycle state, importance, or category
+- **Index lifecycle** — call `reindex()` after large batch loads, `vacuum()` on a schedule
+
+> 📌 **NOTE**
+> The in-memory `VectorStore` is still used by default in dev mode. The pgvector backend is activated by setting `PERSONA0_PGVECTOR_DSN` and instantiating `PgVectorStore` in your bootstrap code. See `src/store/vector_store.py` for the API.
+
+---
+
+### 7.3  Kubernetes Deployment
 
 The `deploy/kubernetes/` directory contains Kubernetes manifests. To deploy to a cluster:
 
 ```bash
-# 1. Tag and push your image to a registry
+# 1. Install provider-specific packages in the image if using a real LLM
+#    (add to requirements or Dockerfile: pip install openai  OR  pip install anthropic)
+
+# 2. Tag and push your image to a registry
 docker tag persona0:local ghcr.io/your-username/persona0:v0.1.0
 docker push ghcr.io/your-username/persona0:v0.1.0
 
@@ -529,7 +583,11 @@ For rollbacks and incident response, see the full runbook in `docs/operations.md
 | `ImportError` on `src.engine.*` | The package is not installed. Run `pip install -e .[dev]` from inside the `persona0/` directory with the venv activated. |
 | Scheduler exits immediately | This usually means a startup config validation error. Run the `validate_startup_config()` check from Section 4.1 and read the error. |
 | All cycles show `ROLLBACK` | Check the `rollback_reason` field in the log. If it says `world_ingest`, the `bad_step` from Test 3 may still be registered. Start a fresh Python session. |
-| "api_key is required" error on staging profile | You must set `PERSONA0_LLM_ADAPTER__API_KEY` as an environment variable. It cannot be in a config file. |
+| "No API key for provider" error | Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` as an environment variable matching the configured provider. |
+| `ModuleNotFoundError: openai` | Run `pip install openai` (or `pip install anthropic` for Anthropic). These are optional and not included in the default install. |
+| `RateLimitError` from provider | Lower `PERSONA0_LLM_ADAPTER__RATE_LIMIT_RPM` or wait for your quota to reset. The adapter retries with backoff automatically. |
+| pgvector `psycopg` import error | Run `pip install "psycopg[binary]" pgvector`. Also confirm `CREATE EXTENSION vector;` was run on your database. |
+| pgvector table missing columns | Call `PgVectorStore.ensure_schema()` on startup to auto-create the table and indexes. |
 | `cycles.jsonl` is empty | The `2>&1 | tee` redirect may not work on your shell. Try running the scheduler first, then checking the log output directly. |
 
 > 💡 **TIP**
@@ -558,7 +616,8 @@ For rollbacks and incident response, see the full runbook in `docs/operations.md
 | `config/profiles/dev.yaml` | Development profile: LLM disabled, deterministic mode on. |
 | `config/defaults.immutable.yaml` | Locked baseline values — do not edit. |
 | `config/defaults.yaml` | Tunable defaults (tick intervals, retrieval weights). |
-| `src/engine/adapters/llm.py` | LLM adapter — the only place that calls a real language model. |
+| `src/engine/adapters/llm.py` | LLM adapter — supports mock, OpenAI, and Anthropic providers. |
+| `src/store/vector_store.py` | In-memory `VectorStore` (dev) and `PgVectorStore` (production) backends. |
 | `src/cli/trace_viewer.py` | CLI tool for reading and visualising cycle logs. |
 | `docs/operations.md` | Production operations runbook. |
 | `_knowledge/initial_research/thesis_v0.10/` | The foundational research thesis (PDF and DOCX). |
@@ -568,9 +627,14 @@ For rollbacks and incident response, see the full runbook in `docs/operations.md
 | Variable | Purpose |
 |---|---|
 | `PERSONA0_CONFIG_PROFILE` | Set the deployment profile: `dev` (default), `staging`, or `prod`. |
-| `PERSONA0_LLM_ADAPTER__API_KEY` | API key for the LLM provider. Required for staging and prod. |
-| `PERSONA0_LLM_ADAPTER__MODEL` | Model name to use (e.g. `gpt-4o`, `claude-sonnet-4-20250514`). |
+| `PERSONA0_LLM_ADAPTER__PROVIDER` | LLM provider: `mock` (default), `openai`, or `anthropic`. |
+| `OPENAI_API_KEY` | OpenAI API key. Required when provider is `openai`. |
+| `ANTHROPIC_API_KEY` | Anthropic API key. Required when provider is `anthropic`. |
+| `PERSONA0_LLM_ADAPTER__MODEL` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`). |
 | `PERSONA0_LLM_ADAPTER__ENABLED` | Override whether the LLM adapter is active (`true` / `false`). |
+| `PERSONA0_LLM_ADAPTER__STREAMING` | Enable streaming responses (`true` / `false`). |
+| `PERSONA0_LLM_ADAPTER__RATE_LIMIT_RPM` | Max requests per minute for rate limiting (default: `60`). |
+| `PERSONA0_PGVECTOR_DSN` | PostgreSQL DSN for production vector store (e.g. `postgresql://user:pass@host/db`). |
 | `PERSONA0_CONFIG_FILES` | Comma-separated paths to additional YAML override files. |
 
 ---
@@ -591,6 +655,8 @@ For rollbacks and incident response, see the full runbook in `docs/operations.md
 | **Deterministic Mode** | A mode in which all LLM calls are replaced by scripted fallback responses. Safe for testing without an API key. |
 | **Rollback** | When a cycle fails mid-execution, the orchestrator restores the state to exactly what it was before the cycle started. |
 | **State Hash** | A SHA-256 fingerprint of the entire agent state at a given moment. Used to verify integrity. |
-| **ISS** | Identity Stability Score — measures how consistent the agent's self-beliefs remain across cycles. |
+| **ISS** | Identity Stability Score — measures how consistent the agent's self-beliefs remain across cycles. Computed by `compute_iss()` in `src/eval/metrics.py`. |
 | **MCS** | Memory Coherence Score — measures how consistent the retrieved memories are with the agent's current self-model. |
+| **ECI** | Emotional Consistency Index — measures affect smoothness over time. Values below 0.3 indicate chaotic emotional dynamics. |
+| **pgvector** | A PostgreSQL extension that adds vector similarity search. Used by `PgVectorStore` as the production memory index backend. |
 | **Governance Policy** | A layer of checks that runs after every cycle to detect unsafe state mutations before they are committed. |
