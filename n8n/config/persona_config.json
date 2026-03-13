@@ -121,6 +121,21 @@
     "confidence_decay_threshold_days": 14,
     "confidence_archival_threshold": 0.15
   },
+  "llm_adapter": {
+    "_comment": "LLM provider configuration. Set provider to 'openai' or 'anthropic' for production.",
+    "provider": "mock",
+    "model": "mock-chat-v1",
+    "timeout_seconds": 30,
+    "retries": 3,
+    "rate_limit_rpm": 60,
+    "streaming": false
+  },
+  "vector_store": {
+    "_comment": "Vector store backend. Set backend to 'pgvector' for production.",
+    "backend": "memory",
+    "dimension": 16,
+    "pgvector_table": "persona0_vectors"
+  },
   "goals": {
     "frustration_threshold_suspension": 0.75,
     "frustration_growth_per_stalled_tick": 0.05,

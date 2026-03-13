@@ -235,6 +235,41 @@ The workflows ship with a **Mock LLM Response** node enabled by default. To conn
 
 ---
 
+## Production LLM Configuration
+
+The Python backend now supports three LLM providers natively:
+
+| Provider | Config Value | Required Env Var | Notes |
+|----------|-------------|-----------------|-------|
+| Mock | `mock` (default) | None | Deterministic responses for dev/test |
+| OpenAI | `openai` | `OPENAI_API_KEY` | Supports streaming, rate limiting |
+| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | Supports streaming, rate limiting |
+
+All providers include:
+- **Exponential backoff** on transient failures (1s, 2s, 4s...)
+- **Rate limiting** via token-bucket (configurable RPM)
+- **Streaming support** for lower time-to-first-token
+- **Response validation** ensuring well-formed outputs
+
+Set `llm_adapter.provider` and `llm_adapter.model` in `config/persona_config.json`, and provide the API key via environment variable.
+
+---
+
+## Production Vector Store
+
+The Python backend supports two vector store backends:
+
+| Backend | Config Value | Requirements | Notes |
+|---------|-------------|-------------|-------|
+| In-memory | `memory` (default) | None | Fast, no persistence, dev/test only |
+| pgvector | `pgvector` | PostgreSQL + pgvector extension | Persistent, batch upsert, index lifecycle |
+
+For pgvector, set `PERSONA0_PGVECTOR_DSN` and run `CREATE EXTENSION vector;` on your database. The store automatically creates tables and indexes on first use.
+
+For n8n workflows, connect to external vector services via HTTP Request nodes (see "Upgrading Storage" below).
+
+---
+
 ## Persistent Storage
 
 By default, the workflows use **n8n's Static Data** (`$getWorkflowStaticData('global')`) to store agent state and episodic memory. This works for development but has limitations:
