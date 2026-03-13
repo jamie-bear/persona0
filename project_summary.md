@@ -89,7 +89,7 @@ A production-readiness review was conducted against the codebase. Findings:
 
 ### What was added
 
-- **LLM Adapter** (`src/engine/adapters/llm.py`): OpenAI and Anthropic providers with streaming response support, token-bucket rate limiting, exponential backoff retry logic, structured response parsing, and `RateLimitError` exception type.
+- **LLM Adapter** (`src/engine/adapters/llm.py`): OpenAI, Anthropic, and Grok (xAI) providers with streaming response support, token-bucket rate limiting, exponential backoff retry logic, structured response parsing, and `RateLimitError` exception type.
 - **PgVectorStore** (`src/store/vector_store.py`): PostgreSQL + pgvector backend with batch upserts, cosine similarity search via IVFFlat index, metadata filtering via GIN index, and lifecycle operations (reindex, vacuum, delete).
 - **n8n configuration** updated with LLM adapter and vector store settings in `persona_config.json` and `credentials_template.json`.
 

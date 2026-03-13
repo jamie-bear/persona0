@@ -1,6 +1,6 @@
 """LLM adapter interface for response generation and event appraisal.
 
-Supports providers: mock (default), openai, anthropic.
+Supports providers: mock (default), openai, anthropic, grok.
 Production providers require api_key via environment variable.
 """
 
@@ -178,6 +178,8 @@ def _call_provider(operation: str, payload: Dict[str, Any], cfg: Dict[str, Any])
         return _call_openai(operation, payload, cfg)
     if provider == "anthropic":
         return _call_anthropic(operation, payload, cfg)
+    if provider == "grok":
+        return _call_grok(operation, payload, cfg)
 
     raise AdapterCallError(f"Unsupported llm_adapter.provider={provider!r}")
 
@@ -224,7 +226,7 @@ def _resolve_api_key(provider: str, cfg: Dict[str, Any]) -> str:
     if key:
         return str(key)
 
-    env_map = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+    env_map = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "grok": "XAI_API_KEY"}
     env_var = env_map.get(provider, "")
     key = os.environ.get(env_var, "")
     if not key:
@@ -402,6 +404,77 @@ def _anthropic_streaming(
         raise AdapterTimeoutError(f"Anthropic timeout (stream): {exc}") from exc
     except anthropic.APIError as exc:
         raise AdapterCallError(f"Anthropic API error (stream): {exc}") from exc
+
+    return "".join(chunks)
+
+
+# ---------------------------------------------------------------------------
+# Grok provider (xAI — OpenAI-compatible API)
+# ---------------------------------------------------------------------------
+
+_GROK_BASE_URL = "https://api.x.ai/v1"
+
+
+def _call_grok(operation: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> Any:
+    """Call xAI Grok API (OpenAI-compatible)."""
+    try:
+        import openai  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise AdapterCallError(
+            "openai package is required for provider=grok (OpenAI-compatible API). "
+            "Install with: pip install openai"
+        ) from exc
+
+    api_key = _resolve_api_key("grok", cfg)
+    model = str(cfg.get("model", "grok-3-latest"))
+    timeout = int(cfg.get("timeout_seconds", 30))
+    streaming = bool(cfg.get("streaming", False))
+    messages = _build_messages(operation, payload)
+
+    client = openai.OpenAI(api_key=api_key, base_url=_GROK_BASE_URL, timeout=timeout)
+
+    try:
+        if streaming:
+            return _grok_streaming(client, model, messages)
+        else:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.7,
+            )
+            content = response.choices[0].message.content or ""
+    except openai.RateLimitError as exc:
+        raise RateLimitError(f"Grok rate limit: {exc}") from exc
+    except openai.APITimeoutError as exc:
+        raise AdapterTimeoutError(f"Grok timeout: {exc}") from exc
+    except openai.APIError as exc:
+        raise AdapterCallError(f"Grok API error: {exc}") from exc
+
+    return _parse_provider_output(operation, content)
+
+
+def _grok_streaming(client: Any, model: str, messages: list) -> str:
+    """Collect a streaming Grok response into a single string."""
+    import openai  # type: ignore[import-untyped]
+
+    chunks: list[str] = []
+    try:
+        stream = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.7,
+            stream=True,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                chunks.append(delta.content)
+    except openai.RateLimitError as exc:
+        raise RateLimitError(f"Grok rate limit (stream): {exc}") from exc
+    except openai.APITimeoutError as exc:
+        raise AdapterTimeoutError(f"Grok timeout (stream): {exc}") from exc
+    except openai.APIError as exc:
+        raise AdapterCallError(f"Grok API error (stream): {exc}") from exc
 
     return "".join(chunks)
 

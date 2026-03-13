@@ -89,6 +89,33 @@ def test_fast_tick_appraise_populates_validated_structured_outputs(monkeypatch):
     assert event["appraisal_results"][0]["goal_congruence"] == 1.0
 
 
+def test_grok_provider_dispatches_correctly(monkeypatch):
+    """Verify that provider=grok routes through _call_grok."""
+    state = AgentState()
+    captured = {}
+
+    def fake_call_grok(operation, payload, cfg):
+        captured["operation"] = operation
+        captured["provider"] = cfg.get("provider")
+        return "Grok response"
+
+    monkeypatch.setattr(
+        "src.engine.adapters.llm.load_config_section",
+        lambda section: {
+            "provider": "grok",
+            "retries": 0,
+            "timeout_seconds": 1,
+            "rate_limit_rpm": 0,
+        },
+    )
+    monkeypatch.setattr("src.engine.adapters.llm._call_grok", fake_call_grok)
+
+    result = llm.generate_response({"user_turn": "hello"}, state)
+    assert result == "Grok response"
+    assert captured["operation"] == "response"
+    assert captured["provider"] == "grok"
+
+
 def test_adapter_appraisal_validation_filters_and_clamps(monkeypatch):
     monkeypatch.setattr(
         "src.engine.adapters.llm.load_config_section",
