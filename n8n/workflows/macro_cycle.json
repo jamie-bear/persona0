@@ -1,0 +1,245 @@
+{
+  "name": "Persona0 — Macro Cycle (Daily)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily Trigger (3am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 1: SELECT_HIGH_SIGNAL_EPISODES\n// Find the most important/significant episodes from the past day.\n\nlet state = $getWorkflowStaticData('global').agentState;\nif (!state) {\n  return [{ json: { skip: true, reason: 'No agent state initialized.' } }];\n}\n\nconst episodicLog = $getWorkflowStaticData('global').episodicLog || [];\nconst oneDayAgo = Date.now() - 86400000;\n\n// Filter to recent, active, important episodes\nconst candidates = episodicLog.filter(e => {\n  const t = new Date(e.created_at).getTime();\n  return t > oneDayAgo && e.lifecycle_state === 'active' && (e.importance || 0) > 0.2;\n});\n\n// Sort by importance descending\ncandidates.sort((a, b) => (b.importance || 0) - (a.importance || 0));\nconst highSignal = candidates.slice(0, 10);\n\nreturn [{\n  json: {\n    state,\n    high_signal_episodes: highSignal,\n    all_episodes: episodicLog,\n    cycle_id: `macro-${Date.now()}`,\n    cycle_type: 'macro',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Select High-Signal Episodes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.skip }}",
+              "value2": true,
+              "operation": "notEqual"
+            }
+          ]
+        }
+      },
+      "name": "Has State?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 2: CLUSTER_EPISODES\n// Group high-signal episodes by theme/category.\n\nconst item = $input.first().json;\nconst episodes = item.high_signal_episodes || [];\n\n// Simple clustering by type/category (in production, use LLM or embeddings)\nconst clusters = {};\nfor (const ep of episodes) {\n  const key = ep.thought_category || ep.type || 'general';\n  if (!clusters[key]) clusters[key] = [];\n  clusters[key].push(ep);\n}\n\nreturn [{\n  json: {\n    ...item,\n    clusters: Object.entries(clusters).map(([theme, eps]) => ({\n      theme,\n      episodes: eps,\n      count: eps.length,\n      avg_importance: eps.reduce((s, e) => s + (e.importance || 0), 0) / eps.length\n    }))\n  }\n}];"
+      },
+      "name": "Cluster Episodes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 3: PRODUCE_CANDIDATE_REFLECTIONS\n// Generate candidate self-belief statements from episode clusters.\n// In production, use an LLM to produce nuanced reflections.\n\nconst item = $input.first().json;\nconst clusters = item.clusters || [];\nconst state = item.state;\n\nconst candidateReflections = [];\nconst maxNew = 3; // max_new_statements_per_cycle\n\nfor (const cluster of clusters) {\n  if (candidateReflections.length >= maxNew) break;\n  if (cluster.count < 2) continue; // need at least 2 episodes for evidence\n\n  // Template-based reflection (replace with LLM in production)\n  const reflectionTemplates = {\n    social: 'I find meaning in connecting with others.',\n    reflection: 'I tend to be introspective and thoughtful.',\n    planning: 'I am proactive about planning ahead.',\n    curiosity: 'I am driven by a desire to understand new things.',\n    rumination: 'I sometimes dwell on things longer than I should.',\n    'self-evaluation': 'I hold myself to high standards.',\n    fantasy: 'I need downtime to recharge.'\n  };\n\n  const statement = reflectionTemplates[cluster.theme] || `I notice a pattern of ${cluster.theme} in my thoughts.`;\n  \n  candidateReflections.push({\n    statement,\n    source_theme: cluster.theme,\n    evidence_count: cluster.count,\n    avg_importance: cluster.avg_importance,\n    episode_ids: cluster.episodes.map(e => e.id)\n  });\n}\n\nreturn [{ json: { ...item, candidate_reflections: candidateReflections } }];"
+      },
+      "name": "Produce Candidate Reflections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 4: SCORE_EVIDENCE_SUFFICIENCY\n// Filter reflections that have enough evidence to update beliefs.\n\nconst item = $input.first().json;\nconst candidates = item.candidate_reflections || [];\n\nconst scored = candidates.map(r => ({\n  ...r,\n  evidence_score: r.evidence_count >= 2 ? Math.min(1.0, r.evidence_count * 0.3) : 0,\n  passes_threshold: r.evidence_count >= 2\n}));\n\nreturn [{ json: { ...item, scored_reflections: scored.filter(r => r.passes_threshold) } }];"
+      },
+      "name": "Score Evidence Sufficiency",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 5: UPDATE_SELF_BELIEFS\n// Update existing beliefs or create new ones, with delta caps.\n\nconst item = $input.first().json;\nconst state = item.state;\nconst reflections = item.scored_reflections || [];\n\nconst maxDelta = 0.15; // max_confidence_delta_per_cycle\nconst highThreshold = 0.75; // high_confidence_threshold\nconst highMinReflections = 2; // high_confidence_min_reflections\nconst maxNew = 3;\n\nlet newCount = 0;\n\nfor (const reflection of reflections) {\n  // Check if an existing belief matches\n  const existing = state.self_model.beliefs.find(\n    b => b.statement === reflection.statement\n  );\n\n  if (existing) {\n    // Update: increase confidence, capped by maxDelta\n    const delta = Math.min(maxDelta, reflection.evidence_score * 0.1);\n    let newConf = existing.confidence + delta;\n    \n    // High confidence gate\n    if (newConf > highThreshold) {\n      const supportCount = (existing.supporting_reflections || []).length + 1;\n      if (supportCount < highMinReflections) {\n        newConf = highThreshold; // cap until enough independent reflections\n      }\n    }\n    \n    existing.confidence = Math.min(1.0, Math.round(newConf * 10000) / 10000);\n    existing.supporting_reflections = [...(existing.supporting_reflections || []), ...reflection.episode_ids].slice(-10);\n    existing.last_challenged_at = new Date().toISOString();\n  } else if (newCount < maxNew) {\n    // Create new belief\n    state.self_model.beliefs.push({\n      id: `belief-${Date.now()}-${newCount}`,\n      statement: reflection.statement,\n      confidence: Math.min(0.55, reflection.evidence_score * 0.5),\n      supporting_reflections: reflection.episode_ids,\n      last_challenged_at: new Date().toISOString(),\n      stability: null,\n      source_type: 'REFLECTION'\n    });\n    newCount++;\n  }\n}\n\nreturn [{ json: { ...item, state, beliefs_updated: reflections.length, beliefs_created: newCount } }];"
+      },
+      "name": "Update Self-Beliefs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 6: DECAY_UNREINFORCED_BELIEFS\n// Reduce confidence of beliefs not reinforced in the last 14 days.\n\nconst item = $input.first().json;\nconst state = item.state;\n\nconst decayRate = 0.02; // confidence_decay_rate_per_cycle\nconst decayThresholdDays = 14;\nconst archivalThreshold = 0.15;\nconst now = Date.now();\nconst thresholdMs = decayThresholdDays * 86400000;\n\nlet decayed = 0;\nlet archived = 0;\n\nstate.self_model.beliefs = state.self_model.beliefs.filter(belief => {\n  // Skip CONST_SEED beliefs — they don't decay\n  if (belief.source_type === 'CONST_SEED') return true;\n  \n  const lastChallenged = belief.last_challenged_at ? new Date(belief.last_challenged_at).getTime() : 0;\n  \n  if (now - lastChallenged > thresholdMs) {\n    belief.confidence = Math.max(0, belief.confidence - decayRate);\n    decayed++;\n    \n    if (belief.confidence < archivalThreshold) {\n      archived++;\n      return false; // Remove (archive) low-confidence beliefs\n    }\n  }\n  \n  return true;\n});\n\nreturn [{ json: { ...item, state, beliefs_decayed: decayed, beliefs_archived: archived } }];"
+      },
+      "name": "Decay Unreinforced Beliefs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 7: GOAL_REVIEW\n// Archive stale goals, review suspended goals.\n\nconst item = $input.first().json;\nconst state = item.state;\n\nconst stalenessDays = 30;\nconst now = Date.now();\nconst stalenessMs = stalenessDays * 86400000;\n\nlet archived = 0;\n\nstate.goals = (state.goals || []).map(goal => {\n  if (goal.status === 'archived' || goal.status === 'completed') return goal;\n  \n  // Archive goals that have been stale (no progress) for too long\n  const createdAt = goal.created_at ? new Date(goal.created_at).getTime() : now;\n  if (now - createdAt > stalenessMs && goal.progress < 0.1) {\n    archived++;\n    return { ...goal, status: 'archived' };\n  }\n  \n  return goal;\n});\n\nreturn [{ json: { ...item, state, goals_archived: archived } }];"
+      },
+      "name": "Goal Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 8: DRIVE_REVIEW\n// Reset drives partially and clear nightly ephemeral data.\n\nconst item = $input.first().json;\nconst state = item.state;\n\n// Drives drift slightly toward baseline during macro cycle\nconst baseline = { social_need: 0.20, mastery_need: 0.15, rest_need: 0.10, curiosity: 0.30 };\nconst driftRate = 0.10;\n\nfor (const d of ['social_need', 'mastery_need', 'rest_need', 'curiosity']) {\n  state.drives[d] += (baseline[d] - state.drives[d]) * driftRate;\n  state.drives[d] = Math.max(0, Math.min(1, state.drives[d]));\n}\n\nreturn [{ json: { ...item, state } }];"
+      },
+      "name": "Drive Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MACRO STEP 9: COMPACT_EPISODIC_MEMORY\n// Lifecycle transitions: active → cooling → archived → deleted\n\nconst item = $input.first().json;\nconst state = item.state;\n\nconst episodicLog = $getWorkflowStaticData('global').episodicLog || [];\n\nconst decayRate = 0.005; // per cycle\nconst coolingThreshold = 0.10; // decay_factor below this → cooling\nconst maxCooled = 100;\nconst maxArchived = 50;\n\nlet cooled = 0;\nlet archived = 0;\n\nfor (const record of episodicLog) {\n  // Apply decay\n  record.decay_factor = (record.decay_factor || 1.0) - decayRate;\n  record.recency = Math.max(0, (record.recency || 1.0) - 0.05);\n  \n  // Lifecycle transitions\n  if (record.lifecycle_state === 'active' && record.decay_factor < coolingThreshold) {\n    if (cooled < maxCooled) {\n      record.lifecycle_state = 'cooling';\n      cooled++;\n    }\n  } else if (record.lifecycle_state === 'cooling') {\n    if (archived < maxArchived) {\n      record.lifecycle_state = 'archived';\n      archived++;\n    }\n  }\n}\n\n// Remove archived records older than 7 days\nconst sevenDaysAgo = Date.now() - 7 * 86400000;\nconst filtered = episodicLog.filter(e => {\n  if (e.lifecycle_state === 'archived') {\n    const t = new Date(e.created_at).getTime();\n    return t > sevenDaysAgo;\n  }\n  return true;\n});\n\n$getWorkflowStaticData('global').episodicLog = filtered;\n\n// Clear nightly ephemeral data\nstate.persisted_desires = [];\nstate.consecutive_thought_categories = [];\n\n// Persist final state\n$getWorkflowStaticData('global').agentState = state;\n\nreturn [{\n  json: {\n    cycle_id: item.cycle_id,\n    cycle_type: 'macro',\n    beliefs_updated: item.beliefs_updated || 0,\n    beliefs_created: item.beliefs_created || 0,\n    beliefs_decayed: item.beliefs_decayed || 0,\n    beliefs_archived: item.beliefs_archived || 0,\n    goals_archived: item.goals_archived || 0,\n    episodes_cooled: cooled,\n    episodes_archived: archived,\n    total_episodes: filtered.length,\n    total_beliefs: state.self_model.beliefs.length,\n    total_goals: state.goals.length,\n    affect: state.affect,\n    drives: state.drives,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Compact Memory & Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 200]
+    }
+  ],
+  "connections": {
+    "Daily Trigger (3am)": {
+      "main": [
+        [
+          {
+            "node": "Select High-Signal Episodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select High-Signal Episodes": {
+      "main": [
+        [
+          {
+            "node": "Has State?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has State?": {
+      "main": [
+        [
+          {
+            "node": "Cluster Episodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cluster Episodes": {
+      "main": [
+        [
+          {
+            "node": "Produce Candidate Reflections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Produce Candidate Reflections": {
+      "main": [
+        [
+          {
+            "node": "Score Evidence Sufficiency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Evidence Sufficiency": {
+      "main": [
+        [
+          {
+            "node": "Update Self-Beliefs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Self-Beliefs": {
+      "main": [
+        [
+          {
+            "node": "Decay Unreinforced Beliefs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decay Unreinforced Beliefs": {
+      "main": [
+        [
+          {
+            "node": "Goal Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Goal Review": {
+      "main": [
+        [
+          {
+            "node": "Drive Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive Review": {
+      "main": [
+        [
+          {
+            "node": "Compact Memory & Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "persona0-macro"
+  },
+  "tags": [
+    {
+      "name": "persona0"
+    },
+    {
+      "name": "macro"
+    }
+  ]
+}

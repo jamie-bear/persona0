@@ -1,0 +1,225 @@
+{
+  "name": "Persona0 — Fast Tick Cycle (30min)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger (30min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 1: WORLD_INGEST — gather world events since last tick\n// In production, this would poll external APIs, news feeds, message queues, etc.\n\nlet state = $getWorkflowStaticData('global').agentState;\nif (!state) {\n  // No state yet — skip this tick\n  return [{ json: { skip: true, reason: 'No agent state initialized. Run Interaction Cycle first.' } }];\n}\n\nstate.tick_counter = (state.tick_counter || 0) + 1;\n\n// Collect any world events (placeholder — integrate your event sources)\nconst worldEvents = [];\n\n// Check for any user interactions since last tick\nconst episodicLog = $getWorkflowStaticData('global').episodicLog || [];\nconst lastTickTime = $getWorkflowStaticData('global').lastFastTick || 0;\nconst now = Date.now();\n\nconst recentInteractions = episodicLog.filter(e => {\n  const t = new Date(e.created_at).getTime();\n  return t > lastTickTime && e.type === 'user_interaction';\n});\n\nif (recentInteractions.length > 0) {\n  worldEvents.push({ type: 'conversation', source: 'user_interaction', count: recentInteractions.length });\n}\n\n$getWorkflowStaticData('global').lastFastTick = now;\n\nreturn [{\n  json: {\n    state,\n    world_events: worldEvents,\n    activity_events: worldEvents,\n    cycle_id: `fast-${state.tick_counter}`,\n    cycle_type: 'fast_tick',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "World Ingest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.skip }}",
+              "value2": true,
+              "operation": "notEqual"
+            }
+          ]
+        }
+      },
+      "name": "Has State?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 2: APPRAISE — evaluate world events against goals/values\nconst item = $input.first().json;\nconst state = item.state;\nconst worldEvents = item.world_events || [];\n\nconst appraisals = [];\nfor (const event of worldEvents) {\n  let goalCongruence = 0;\n  let threat = 0;\n  let arousalCue = 0;\n\n  // Events that progress goals are positively appraised\n  if (event.type === 'conversation') {\n    goalCongruence = 0.2;\n    arousalCue = 0.1;\n  } else if (event.type === 'goal_progress') {\n    goalCongruence = 0.4;\n    arousalCue = 0.2;\n  } else if (event.type === 'threat' || event.type === 'conflict') {\n    threat = 0.3;\n    arousalCue = 0.3;\n  }\n\n  appraisals.push({ goal_congruence: goalCongruence, threat, arousal_cue: arousalCue, source_event: event.type });\n}\n\nreturn [{ json: { ...item, appraisals } }];"
+      },
+      "name": "Appraise Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 3: UPDATE_EMOTION — EMA-based affect update\nconst item = $input.first().json;\nconst state = item.state;\nconst appraisals = item.appraisals || [];\nconst tick = state.tick_counter || 0;\n\nfunction ema(v, b, r) { return v + (b - v) * r; }\nfunction clamp(v, lo = -1, hi = 1) { return Math.max(lo, Math.min(hi, v)); }\n\nconst baseline = { valence: 0.10, arousal: 0.30, stress: 0.10, energy: 0.70 };\nconst decay = { valence: 0.05, arousal: 0.08, stress: 0.06, energy: 0.04 };\n\n// 1. EMA decay\nlet valence = ema(state.affect.valence, baseline.valence, decay.valence);\nlet arousal = ema(state.affect.arousal, baseline.arousal, decay.arousal);\nlet stress = ema(state.affect.stress, baseline.stress, decay.stress);\nlet energy = ema(state.affect.energy, baseline.energy, decay.energy);\n\n// 2. Circadian modulation\nconst ticksPerDay = 48; // 30-min intervals\nconst amplitude = 0.15;\nconst peakTick = 10 * 2; // hour 10 * 2 ticks/hour\nconst phase = (2 * Math.PI * ((tick % ticksPerDay) - peakTick)) / ticksPerDay;\nenergy += amplitude * Math.cos(phase);\n\n// 3. Appraisal deltas\nfor (const a of appraisals) {\n  valence += (a.goal_congruence || 0) * 0.10;\n  stress += (a.threat || 0) * 0.10;\n  arousal += (a.arousal_cue || 0) * 0.05;\n}\n\nstate.affect = {\n  valence: clamp(valence), arousal: clamp(arousal),\n  stress: clamp(stress), energy: clamp(energy)\n};\n\n// Stress → rest coupling\nconst restBoost = stress > 0.70 ? 0.01 : 0.0;\n\nreturn [{ json: { ...item, state, _rest_boost: restBoost } }];"
+      },
+      "name": "Update Emotion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 4: UPDATE_DRIVES — growth, satisfaction, and stress coupling\nconst item = $input.first().json;\nconst state = item.state;\nconst activityEvents = item.activity_events || [];\nconst restBoost = item._rest_boost || 0.0;\n\nconst DRIVE_NAMES = ['social_need', 'mastery_need', 'rest_need', 'curiosity'];\nconst growthRates = { social_need: 0.04, mastery_need: 0.02, rest_need: 0.03, curiosity: 0.01 };\nconst satisfactionMap = {\n  social_need: { satisfied_by: ['conversation', 'social_activity', 'group_event'], reduction: 0.25 },\n  mastery_need: { satisfied_by: ['goal_progress', 'task_completion', 'learning_episode'], reduction: 0.20 },\n  rest_need: { satisfied_by: ['sleep', 'low_arousal_idle_period'], reduction: 0.40 },\n  curiosity: { satisfied_by: ['reading', 'exploring_topic', 'creative_activity'], reduction: 0.30 }\n};\n\nconst drives = { ...state.drives };\n\n// Growth\nfor (const d of DRIVE_NAMES) drives[d] += growthRates[d] || 0;\ndrives.rest_need += restBoost;\n\n// Satisfaction\nconst eventTypes = activityEvents.map(e => e.type || '');\nfor (const d of DRIVE_NAMES) {\n  const sat = satisfactionMap[d];\n  if (!sat) continue;\n  for (const t of eventTypes) {\n    if (sat.satisfied_by.includes(t)) drives[d] -= sat.reduction;\n  }\n}\n\n// Clamp\nfor (const d of DRIVE_NAMES) drives[d] = Math.max(0, Math.min(1, drives[d]));\n\nstate.drives = drives;\nreturn [{ json: { ...item, state } }];"
+      },
+      "name": "Update Drives",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 5: GENERATE_THOUGHT — produce one thought fragment per tick\nconst item = $input.first().json;\nconst state = item.state;\nconst tick = state.tick_counter || 0;\n\nconst CATEGORIES = ['reflection', 'planning', 'rumination', 'curiosity', 'self-evaluation', 'social', 'fantasy'];\n\nconst templates = {\n  reflection: ['Thinking about what matters most right now.', 'Sitting with a quiet sense of what today has been.', 'Noticing patterns in how things have been going lately.', 'Wondering what I make of recent events.'],\n  planning: ['Thinking through what needs to happen next.', 'Mapping out steps to move something forward.', 'Weighing different approaches to a current challenge.', 'Imagining what progress would look like.'],\n  rumination: ['Turning something difficult over in my mind again.', 'Finding it hard to set aside what\\'s been bothering me.', 'Dwelling on something that didn\\'t go the way I hoped.', 'Replaying a moment that still feels unresolved.'],\n  curiosity: ['Wondering about something I don\\'t fully understand yet.', 'Feeling pulled toward a question I haven\\'t explored.', 'Noticing an interesting idea I\\'d like to think through.', 'Something unfamiliar has caught my attention.'],\n  'self-evaluation': ['Asking myself whether I\\'m living up to what I care about.', 'Reconsidering how I handled something recently.', 'Checking in with whether I\\'m on the right track.', 'Wondering if I could do better in some area.'],\n  social: ['Thinking about someone I\\'d like to reach out to.', 'Remembering a recent exchange that stayed with me.', 'Wondering how someone I care about is doing.', 'Feeling the pull of wanting to connect.'],\n  fantasy: ['Imagining a quiet, low-demand stretch of time.', 'Daydreaming about stepping back from everything for a bit.', 'Picturing a simpler moment without any pressing demands.', 'Wishing for a slower pace, at least for now.']\n};\n\n// Category selection based on affect/drives\nlet category = 'reflection';\nconst { affect, drives } = state;\nif (affect.valence < -0.3) {\n  category = drives.mastery_need > 0.4 ? 'self-evaluation' : 'rumination';\n} else if (affect.arousal > 0.6) {\n  category = drives.curiosity > drives.mastery_need ? 'curiosity' : 'planning';\n} else if (drives.social_need > 0.5) {\n  category = 'social';\n}\n\n// Guardrail: no more than 3 consecutive same category\nconst recent = state.consecutive_thought_categories || [];\nif (recent.length >= 3 && recent.slice(-3).every(c => c === category)) {\n  category = CATEGORIES.find(c => c !== category) || 'reflection';\n}\n\nconst text = templates[category][tick % templates[category].length];\n\n// Track consecutive categories (cap at 3)\nconst updatedRecent = [...recent, category].slice(-3);\nstate.consecutive_thought_categories = updatedRecent;\n\nconst thought = {\n  id: `thought-${tick}-${Date.now()}`,\n  text,\n  thought_category: category,\n  trigger: 'internal',\n  intrusiveness: Math.min(1.0, 0.3 + Math.abs(affect.valence - 0.1) * 0.3),\n  created_at: new Date().toISOString()\n};\n\nreturn [{ json: { ...item, state, thought } }];"
+      },
+      "name": "Generate Thought",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 6: SALIENCE_FILTER — lightweight salience check for tick\nconst item = $input.first().json;\nconst state = item.state;\n\n// In fast tick, salience filtering is simpler than interaction cycle\n// Just note the thought as current focus\nstate.attention = {\n  current_focus: item.thought?.thought_category || null,\n  salience_buffer: state.attention?.salience_buffer || []\n};\n\nreturn [{ json: { ...item, state } }];"
+      },
+      "name": "Salience Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 7: UPDATE_GOALS — tick goal progress and frustration\nconst item = $input.first().json;\nconst state = item.state;\n\nconst suspensionThreshold = 0.75;\nconst frustrationGrowth = 0.05;\nconst frustrationDecay = 0.10;\n\nstate.goals = (state.goals || []).map(goal => {\n  if (goal.status !== 'active') return goal;\n  \n  const stalled = (goal.blocked_by || []).length > 0;\n  let progress = goal.progress;\n  let frustration = goal.frustration;\n  let status = goal.status;\n  \n  if (stalled) {\n    frustration = Math.min(1.0, frustration + frustrationGrowth);\n  } else {\n    progress = Math.min(1.0, progress + 0.01);\n    frustration = Math.max(0.0, frustration - frustrationDecay);\n  }\n  \n  if (frustration >= suspensionThreshold) status = 'suspended';\n  \n  return { ...goal, progress: Math.round(progress * 10000) / 10000, frustration: Math.round(frustration * 10000) / 10000, status };\n});\n\nreturn [{ json: { ...item, state } }];"
+      },
+      "name": "Update Goals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 8: WRITE_MEMORY — persist thought as episodic event\nconst item = $input.first().json;\nconst state = item.state;\nconst thought = item.thought;\n\nif (thought) {\n  const episodicLog = $getWorkflowStaticData('global').episodicLog || [];\n  episodicLog.push({\n    id: thought.id,\n    type: 'thought',\n    text: thought.text,\n    thought_category: thought.thought_category,\n    importance: thought.intrusiveness * 0.5,\n    similarity: 0,\n    recency: 1.0,\n    self_relevance: 0.2,\n    created_at: thought.created_at,\n    lifecycle_state: 'active',\n    affect_snapshot: { ...state.affect },\n    drive_snapshot: { ...state.drives }\n  });\n  \n  // Cap episodic log size\n  if (episodicLog.length > 200) episodicLog.splice(0, episodicLog.length - 200);\n  $getWorkflowStaticData('global').episodicLog = episodicLog;\n}\n\n// Persist updated state\n$getWorkflowStaticData('global').agentState = state;\n\n// Clear ephemeral\nstate.attention = { current_focus: null, salience_buffer: [] };\nstate.active_desires = [];\n\nreturn [{\n  json: {\n    cycle_id: item.cycle_id,\n    cycle_type: 'fast_tick',\n    tick_counter: state.tick_counter,\n    thought_category: thought?.thought_category,\n    affect: state.affect,\n    drives: state.drives,\n    active_goals: state.goals.filter(g => g.status === 'active').length,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Write Memory & Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 200]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (30min)": {
+      "main": [
+        [
+          {
+            "node": "World Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "World Ingest": {
+      "main": [
+        [
+          {
+            "node": "Has State?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has State?": {
+      "main": [
+        [
+          {
+            "node": "Appraise Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Appraise Events": {
+      "main": [
+        [
+          {
+            "node": "Update Emotion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Emotion": {
+      "main": [
+        [
+          {
+            "node": "Update Drives",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Drives": {
+      "main": [
+        [
+          {
+            "node": "Generate Thought",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Thought": {
+      "main": [
+        [
+          {
+            "node": "Salience Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salience Filter": {
+      "main": [
+        [
+          {
+            "node": "Update Goals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Goals": {
+      "main": [
+        [
+          {
+            "node": "Write Memory & Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "persona0-fast-tick"
+  },
+  "tags": [
+    {
+      "name": "persona0"
+    },
+    {
+      "name": "fast-tick"
+    }
+  ]
+}

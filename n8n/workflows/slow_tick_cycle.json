@@ -1,0 +1,185 @@
+{
+  "name": "Persona0 — Slow Tick Cycle (3hr)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger (3hr)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SLOW TICK: Performs all fast-tick steps PLUS additional slow-tick steps:\n//   - Activity transition\n//   - Routine event generation\n//   - Desire generation (from drives above impulse threshold)\n//   - Desire lifecycle management (aging, persistence, crystallization)\n\nlet state = $getWorkflowStaticData('global').agentState;\nif (!state) {\n  return [{ json: { skip: true, reason: 'No agent state initialized.' } }];\n}\n\nstate.tick_counter = (state.tick_counter || 0) + 1;\n\nconst episodicLog = $getWorkflowStaticData('global').episodicLog || [];\nconst lastSlowTick = $getWorkflowStaticData('global').lastSlowTick || 0;\nconst now = Date.now();\n\n// Gather world events since last slow tick\nconst recentEvents = episodicLog.filter(e => {\n  const t = new Date(e.created_at).getTime();\n  return t > lastSlowTick;\n});\n\nconst worldEvents = [];\nconst conversationCount = recentEvents.filter(e => e.type === 'user_interaction').length;\nif (conversationCount > 0) {\n  worldEvents.push({ type: 'conversation', count: conversationCount });\n}\n\n$getWorkflowStaticData('global').lastSlowTick = now;\n\nreturn [{\n  json: {\n    state,\n    world_events: worldEvents,\n    activity_events: worldEvents,\n    cycle_id: `slow-${state.tick_counter}`,\n    cycle_type: 'slow_tick',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "World Ingest (Slow)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.skip }}",
+              "value2": true,
+              "operation": "notEqual"
+            }
+          ]
+        }
+      },
+      "name": "Has State?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// FAST-TICK STEPS: Appraise → Emotion → Drives → Thought → Salience → Goals → Write\n// Condensed into one Code node for the slow tick (same logic as fast_tick_cycle.json)\n\nconst item = $input.first().json;\nconst state = item.state;\nconst worldEvents = item.world_events || [];\nconst activityEvents = item.activity_events || [];\nconst tick = state.tick_counter || 0;\n\n// ── APPRAISE ──\nconst appraisals = worldEvents.map(e => ({\n  goal_congruence: e.type === 'conversation' ? 0.2 : 0,\n  threat: 0,\n  arousal_cue: e.type === 'conversation' ? 0.1 : 0\n}));\n\n// ── UPDATE EMOTION ──\nfunction ema(v, b, r) { return v + (b - v) * r; }\nfunction clamp(v, lo = -1, hi = 1) { return Math.max(lo, Math.min(hi, v)); }\n\nconst baseline = { valence: 0.10, arousal: 0.30, stress: 0.10, energy: 0.70 };\nconst decay = { valence: 0.05, arousal: 0.08, stress: 0.06, energy: 0.04 };\n\nlet valence = ema(state.affect.valence, baseline.valence, decay.valence);\nlet arousal = ema(state.affect.arousal, baseline.arousal, decay.arousal);\nlet stress = ema(state.affect.stress, baseline.stress, decay.stress);\nlet energy = ema(state.affect.energy, baseline.energy, decay.energy);\n\nconst ticksPerDay = 48;\nconst phase = (2 * Math.PI * ((tick % ticksPerDay) - 20)) / ticksPerDay;\nenergy += 0.15 * Math.cos(phase);\n\nfor (const a of appraisals) {\n  valence += (a.goal_congruence || 0) * 0.10;\n  stress += (a.threat || 0) * 0.10;\n  arousal += (a.arousal_cue || 0) * 0.05;\n}\n\nstate.affect = { valence: clamp(valence), arousal: clamp(arousal), stress: clamp(stress), energy: clamp(energy) };\nconst restBoost = stress > 0.70 ? 0.01 : 0.0;\n\n// ── UPDATE DRIVES ──\nconst DRIVE_NAMES = ['social_need', 'mastery_need', 'rest_need', 'curiosity'];\nconst growthRates = { social_need: 0.04, mastery_need: 0.02, rest_need: 0.03, curiosity: 0.01 };\nconst satMap = {\n  social_need: { by: ['conversation'], r: 0.25 },\n  mastery_need: { by: ['goal_progress', 'task_completion'], r: 0.20 },\n  rest_need: { by: ['sleep'], r: 0.40 },\n  curiosity: { by: ['reading', 'exploring_topic'], r: 0.30 }\n};\n\nfor (const d of DRIVE_NAMES) state.drives[d] += growthRates[d] || 0;\nstate.drives.rest_need += restBoost;\nconst eventTypes = activityEvents.map(e => e.type || '');\nfor (const d of DRIVE_NAMES) {\n  const s = satMap[d];\n  if (s) for (const t of eventTypes) if (s.by.includes(t)) state.drives[d] -= s.r;\n}\nfor (const d of DRIVE_NAMES) state.drives[d] = Math.max(0, Math.min(1, state.drives[d]));\n\n// ── GENERATE THOUGHT ──\nconst templates = {\n  reflection: ['Thinking about what matters most right now.', 'Noticing patterns in how things have been going lately.'],\n  planning: ['Thinking through what needs to happen next.', 'Mapping out steps to move something forward.'],\n  social: ['Thinking about someone I\\'d like to reach out to.', 'Feeling the pull of wanting to connect.'],\n  curiosity: ['Wondering about something I don\\'t fully understand yet.', 'Something unfamiliar has caught my attention.']\n};\nlet category = 'reflection';\nif (state.affect.valence < -0.3) category = 'rumination';\nelse if (state.drives.social_need > 0.5) category = 'social';\nelse if (state.affect.arousal > 0.6) category = state.drives.curiosity > state.drives.mastery_need ? 'curiosity' : 'planning';\n\nconst catTemplates = templates[category] || templates.reflection;\nconst thought = { id: `thought-slow-${tick}`, text: catTemplates[tick % catTemplates.length], thought_category: category };\n\n// ── UPDATE GOALS ──\nstate.goals = (state.goals || []).map(g => {\n  if (g.status !== 'active') return g;\n  const stalled = (g.blocked_by || []).length > 0;\n  let p = g.progress, f = g.frustration, s = g.status;\n  if (stalled) f = Math.min(1, f + 0.05); else { p = Math.min(1, p + 0.01); f = Math.max(0, f - 0.10); }\n  if (f >= 0.75) s = 'suspended';\n  return { ...g, progress: Math.round(p * 1e4) / 1e4, frustration: Math.round(f * 1e4) / 1e4, status: s };\n});\n\nreturn [{ json: { ...item, state, thought, appraisals } }];"
+      },
+      "name": "Fast-Tick Steps (condensed)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SLOW-TICK STEP: ACTIVITY_TRANSITION\n// Determine if the persona should change their current activity.\n\nconst item = $input.first().json;\nconst state = item.state;\n\n// Simple activity transition logic (replace with LLM-driven in production)\nconst drives = state.drives;\nlet newActivity = state.activity.current_activity;\n\nif (drives.rest_need > 0.7) {\n  newActivity = 'resting';\n} else if (drives.social_need > 0.6) {\n  newActivity = 'seeking_connection';\n} else if (drives.mastery_need > 0.6) {\n  newActivity = 'working_on_goal';\n} else if (drives.curiosity > 0.7) {\n  newActivity = 'exploring';\n} else {\n  newActivity = 'idle';\n}\n\nstate.activity.current_activity = newActivity;\n\nreturn [{ json: { ...item, state } }];"
+      },
+      "name": "Activity Transition",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SLOW-TICK STEP: ROUTINE_EVENT\n// Generate synthetic routine events based on current activity.\n\nconst item = $input.first().json;\nconst state = item.state;\nconst activity = state.activity.current_activity;\n\nconst routineEvents = [];\n\n// Map activity to event types for drive satisfaction\nconst activityToEvents = {\n  resting: [{ type: 'low_arousal_idle_period' }],\n  seeking_connection: [{ type: 'social_activity' }],\n  working_on_goal: [{ type: 'goal_progress' }],\n  exploring: [{ type: 'exploring_topic' }],\n  reading: [{ type: 'reading' }],\n  idle: []\n};\n\nroutineEvents.push(...(activityToEvents[activity] || []));\n\nreturn [{ json: { ...item, state, routine_events: routineEvents } }];"
+      },
+      "name": "Routine Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SLOW-TICK STEP: DESIRE_GENERATION\n// Generate ephemeral desires when drives exceed impulse thresholds.\n// Manage desire lifecycle: aging, persistence, crystallization into goals.\n\nconst item = $input.first().json;\nconst state = item.state;\nconst tick = state.tick_counter;\n\nconst DRIVE_NAMES = ['social_need', 'mastery_need', 'rest_need', 'curiosity'];\nconst impulseThreshold = { social_need: 0.65, mastery_need: 0.70, rest_need: 0.70, curiosity: 0.75 };\nconst contentTemplates = {\n  social_need: 'want to connect with someone',\n  mastery_need: 'want to work on something meaningful',\n  rest_need: 'want to slow down and rest',\n  curiosity: 'want to explore something new'\n};\n\n// 1. Generate new desires\nconst newDesires = [];\nfor (const d of DRIVE_NAMES) {\n  const value = state.drives[d];\n  if (value >= (impulseThreshold[d] || 1.0)) {\n    newDesires.push({\n      id: `desire-${d}-${tick}`,\n      source_drive: d,\n      urgency: Math.round(value * 10000) / 10000,\n      approach: true,\n      expires_after_ticks: 3,\n      age_in_ticks: 0,\n      created_at_tick: tick,\n      content: `${contentTemplates[d]} (intensity ${value.toFixed(2)})`\n    });\n  }\n}\nstate.active_desires = newDesires;\n\n// 2. Age and expire persisted desires\nlet persisted = (state.persisted_desires || []).map(d => ({\n  ...d, age_in_ticks: (d.age_in_ticks || 0) + 1\n})).filter(d => d.age_in_ticks < (d.expires_after_ticks || 3));\n\n// 3. Persist high-urgency new desires\nconst persistenceThreshold = 0.50;\nconst toPersist = newDesires.filter(d => d.urgency >= persistenceThreshold);\nconst byDrive = {};\nfor (const d of [...persisted, ...toPersist]) {\n  const drive = d.source_drive;\n  if (!byDrive[drive] || d.urgency > byDrive[drive].urgency) byDrive[drive] = d;\n}\npersisted = Object.values(byDrive);\nstate.persisted_desires = persisted;\n\n// 4. Check crystallization: desires old enough → propose new goals\nconst crystallizationThreshold = 6;\nconst urgencyMin = 0.65;\nconst dampen = 0.60;\nconst activeDriveGoals = new Set(\n  (state.goals || []).filter(g => g.status === 'active' && g.crystallized_from_drive).map(g => g.crystallized_from_drive)\n);\n\nconst goalProposals = [];\nconst proposedDrives = new Set();\nfor (const desire of persisted) {\n  const drive = desire.source_drive;\n  if (proposedDrives.has(drive) || desire.age_in_ticks < crystallizationThreshold) continue;\n  if (desire.urgency < urgencyMin || activeDriveGoals.has(drive)) continue;\n  \n  goalProposals.push({\n    id: `goal-${drive}-${desire.id}`,\n    label: `Address ${drive.replace(/_/g, ' ')}`,\n    motive: drive,\n    priority: Math.round(desire.urgency * dampen * 10000) / 10000,\n    horizon: 'short',\n    progress: 0.0,\n    frustration: 0.0,\n    status: 'active',\n    crystallized_from_drive: drive,\n    crystallized_at: `tick:${desire.created_at_tick}`,\n    created_at: new Date().toISOString(),\n    blocked_by: []\n  });\n  proposedDrives.add(drive);\n}\n\n// Accept proposals if under max active goals (8)\nconst maxGoals = 8;\nconst activeCount = (state.goals || []).filter(g => g.status === 'active').length;\nfor (const proposal of goalProposals) {\n  if (activeCount + goalProposals.indexOf(proposal) >= maxGoals) break;\n  if (!activeDriveGoals.has(proposal.crystallized_from_drive)) {\n    state.goals.push(proposal);\n  }\n}\n\nreturn [{ json: { ...item, state, new_desires: newDesires.length, crystallized_goals: goalProposals.length } }];"
+      },
+      "name": "Desire Generation & Crystallization",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WRITE & LOG — persist state and write episodic memory\nconst item = $input.first().json;\nconst state = item.state;\nconst thought = item.thought;\n\n// Write thought to episodic log\nif (thought) {\n  const log = $getWorkflowStaticData('global').episodicLog || [];\n  log.push({\n    id: thought.id,\n    type: 'thought',\n    text: thought.text,\n    thought_category: thought.thought_category,\n    importance: 0.3,\n    similarity: 0,\n    recency: 1.0,\n    self_relevance: 0.2,\n    created_at: new Date().toISOString(),\n    lifecycle_state: 'active',\n    affect_snapshot: { ...state.affect },\n    drive_snapshot: { ...state.drives }\n  });\n  if (log.length > 200) log.splice(0, log.length - 200);\n  $getWorkflowStaticData('global').episodicLog = log;\n}\n\n// Persist state\nstate.attention = { current_focus: null, salience_buffer: [] };\nstate.active_desires = [];\n$getWorkflowStaticData('global').agentState = state;\n\nreturn [{\n  json: {\n    cycle_id: item.cycle_id,\n    cycle_type: 'slow_tick',\n    tick_counter: state.tick_counter,\n    activity: state.activity.current_activity,\n    new_desires: item.new_desires || 0,\n    crystallized_goals: item.crystallized_goals || 0,\n    total_goals: state.goals.length,\n    affect: state.affect,\n    drives: state.drives,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Write & Log (Slow)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 200]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (3hr)": {
+      "main": [
+        [
+          {
+            "node": "World Ingest (Slow)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "World Ingest (Slow)": {
+      "main": [
+        [
+          {
+            "node": "Has State?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has State?": {
+      "main": [
+        [
+          {
+            "node": "Fast-Tick Steps (condensed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fast-Tick Steps (condensed)": {
+      "main": [
+        [
+          {
+            "node": "Activity Transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activity Transition": {
+      "main": [
+        [
+          {
+            "node": "Routine Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Routine Event": {
+      "main": [
+        [
+          {
+            "node": "Desire Generation & Crystallization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Desire Generation & Crystallization": {
+      "main": [
+        [
+          {
+            "node": "Write & Log (Slow)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "persona0-slow-tick"
+  },
+  "tags": [
+    {
+      "name": "persona0"
+    },
+    {
+      "name": "slow-tick"
+    }
+  ]
+}
