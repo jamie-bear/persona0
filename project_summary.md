@@ -59,7 +59,7 @@ In short: the codebase has moved from deterministic-core-only toward an operatio
 | CP-4 | Done | Macro reflection, belief update/decay, and lifecycle review implemented. |
 | CP-5 | Done | Governance outcomes, PII redaction, forget semantics, and memory lifecycle compaction implemented. |
 | CP-6 | Done | Metrics, latency checks, and multi-day replay tests implemented. |
-| Productionization follow-up | In progress | External provider integrations and persistent production backends remain to be finalized. |
+| Productionization follow-up | Done | OpenAI/Anthropic LLM adapters and pgvector backend implemented. |
 
 ---
 
@@ -77,22 +77,35 @@ Four issues were found and corrected that would have broken a production deploym
 
 ---
 
+## Production-Readiness Assessment
+
+A production-readiness review was conducted against the codebase. Findings:
+
+| Feedback Item | Claim | Assessment | Action Taken |
+|---|---|---|---|
+| 1.1 `compute_iss()` | "No implementation" | **Incorrect** — fully implemented at `src/eval/metrics.py:189-231` since v0.17 | None needed |
+| 1.2 LLM Adapter | Needs production providers | **Valid** — was mock-only | Implemented OpenAI + Anthropic providers with streaming, exponential backoff, rate limiting |
+| 1.3 Vector Store | Needs production backend | **Valid** — was in-memory only | Implemented `PgVectorStore` with batch upsert, hybrid search, index lifecycle |
+
+### What was added
+
+- **LLM Adapter** (`src/engine/adapters/llm.py`): OpenAI and Anthropic providers with streaming response support, token-bucket rate limiting, exponential backoff retry logic, structured response parsing, and `RateLimitError` exception type.
+- **PgVectorStore** (`src/store/vector_store.py`): PostgreSQL + pgvector backend with batch upserts, cosine similarity search via IVFFlat index, metadata filtering via GIN index, and lifecycle operations (reindex, vacuum, delete).
+- **n8n configuration** updated with LLM adapter and vector store settings in `persona_config.json` and `credentials_template.json`.
+
+---
+
 ## Remaining Work (Practical)
 
-The major architectural pieces are present; remaining work is mostly integration hardening:
+The major architectural pieces are present; remaining work is operational hardening:
 
-1. **Provider-grade LLM integration**
-   - Implement non-mock providers in the LLM adapter (currently mock-first).
-   - Add provider-specific resilience (timeouts, retries, rate-limit behavior).
-
-2. **Production vector backend**
-   - Replace in-memory vector adapter with persistent backend (e.g., Chroma/pgvector).
-   - Add migration/bootstrap tooling for existing episodic records.
-
-3. **Release hardening**
+1. **Release hardening**
    - Enforce CI quality gates on every branch path used in deployment.
    - Finalize SLO thresholds/alerts for rollback rate, latency, and policy-failure spikes.
 
-4. **Operational validation**
+2. **Operational validation**
    - Run staging soak tests (multi-day scheduler runs, recovery drills, dead-letter replay workflow).
    - Validate deployment playbooks and rollback drills end-to-end.
+
+3. **Embedding adapter upgrade**
+   - Replace deterministic SHA256 embeddings with OpenAI `text-embedding-3-small` or equivalent for production semantic search quality.
