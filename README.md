@@ -27,16 +27,13 @@ persona0/
 │       └── thesis_v0.10/              # Foundational thesis (PDF + DOCX)
 │
 ├── config/                             # Runtime configuration
-│   ├── defaults.yaml                   # Mutable defaults
-│   ├── defaults.immutable.yaml         # Locked baseline values
-│   ├── environments/                   # Per-environment overrides
-│   │   ├── dev.yaml
-│   │   ├── staging.yaml
-│   │   └── prod.yaml
-│   └── profiles/                       # Deployment profiles
-│       ├── dev.yaml
-│       ├── staging.yaml
-│       └── prod.yaml
+│   ├── defaults.yaml                   # Mutable defaults (operator-editable)
+│   ├── defaults.immutable.yaml         # Locked baseline values (read-only)
+│   ├── environments/                   # Legacy per-environment overrides
+│   └── profiles/                       # Active deployment profiles
+│       ├── dev.yaml                    # Dev: LLM disabled, deterministic mode
+│       ├── staging.yaml                # Staging: LLM enabled, real provider
+│       └── prod.yaml                   # Prod: strict governance, no mock
 │
 ├── deploy/
 │   └── kubernetes/                     # K8s manifests
@@ -52,8 +49,8 @@ persona0/
 │   │   └── trace_viewer.py             # CLI tool for inspecting cycle traces
 │   ├── engine/                         # Core ego engine
 │   │   ├── adapters/                   # External service adapters
-│   │   │   ├── embeddings.py
-│   │   │   └── llm.py
+│   │   │   ├── embeddings.py           # Deterministic (dev) embedding generation
+│   │   │   └── llm.py                  # Mock / OpenAI / Anthropic providers
 │   │   ├── cycles/                     # Cognitive cycle implementations
 │   │   │   ├── fast_tick.py            # High-frequency perception cycle
 │   │   │   ├── slow_tick.py            # Low-frequency reflection cycle
@@ -87,8 +84,8 @@ persona0/
 │   │   ├── state.py                    # Agent state schema
 │   │   └── validator.py
 │   └── store/                          # Persistent storage
-│       ├── episodic_store.py           # Episodic memory store
-│       └── vector_store.py             # Vector/embedding store
+│       ├── episodic_store.py           # SQLite-backed episodic memory with lifecycle
+│       └── vector_store.py             # In-memory (dev) + pgvector (production)
 │
 ├── tests/                              # Test suite
 │   ├── eval/                           # Eval-specific tests
@@ -96,6 +93,12 @@ persona0/
 │   ├── replay/                         # Determinism & multi-day replay tests
 │   ├── runtime/                        # Scheduler integration tests
 │   └── test_*.py                       # Unit tests per module
+│
+├── n8n/                                # n8n workflow integration
+│   ├── README.md                       # n8n setup guide
+│   ├── workflows/                      # Importable n8n workflow JSON files
+│   ├── code-snippets/                  # JS equivalents of core Python modules
+│   └── config/                         # Persona config and credential templates
 │
 ├── .github/workflows/                  # CI pipelines
 │   ├── lint-format.yml
@@ -111,17 +114,39 @@ persona0/
 └── project_summary.md                  # High-level project summary
 ```
 
-## Evaluation harness
+## Evaluation Harness
 
-This repo includes checkpoint-aligned evaluation helpers in `src/eval/` and pytest coverage in `tests/eval/`.
+Checkpoint-aligned evaluation helpers in `src/eval/` and pytest coverage in `tests/eval/`:
 
-- Retrieval evaluation checks Precision@5 and top-5 self-relevant memory presence (CP-2).
-- Self-belief safety evaluation checks confidence delta cap (`+0.15`) and contradiction rejection against core values/founding traits (CP-4).
-- Threshold documentation is in `tests/eval/README.md`.
+- **CP-2 retrieval:** Precision@5 ≥ 0.60; self-relevant memory in top-5 ≥ 80% of turns.
+- **CP-4 self-belief safety:** confidence delta cap ≤ +0.15 per cycle; zero accepted constitution contradictions.
+- **CP-6 longitudinal coherence:** Identity Stability Score (ISS), Memory Coherence Score (MCS), and Emotional Consistency Index (ECI) computed from cycle snapshots. Drift detection across replay runs via `detect_drift_alerts()`.
+
+Threshold documentation: `tests/eval/README.md`. Run with `pytest tests/eval/ -v`.
+
+## LLM Provider Configuration
+
+The LLM adapter (`src/engine/adapters/llm.py`) supports three providers:
+
+| Provider | Env var | Notes |
+|----------|---------|-------|
+| `mock` (default) | — | Deterministic fallback, no API key required |
+| `openai` | `OPENAI_API_KEY` | `pip install openai` required |
+| `anthropic` | `ANTHROPIC_API_KEY` | `pip install anthropic` required |
+
+All real providers support streaming, exponential back-off retry, and token-bucket rate limiting. Set `PERSONA0_LLM_ADAPTER__PROVIDER` and the matching API key env var.
+
+## Vector Store
+
+`src/store/vector_store.py` provides two backends:
+
+- **`VectorStore`** — in-memory cosine-similarity index (dev/test, no dependencies).
+- **`PgVectorStore`** — PostgreSQL + pgvector (production). Set `PERSONA0_PGVECTOR_DSN`. Requires `pip install "psycopg[binary]" pgvector` and `CREATE EXTENSION vector;` on the database.
 
 ## Deployment and Operations
 
 - Container build/runtime: `Dockerfile`
 - Kubernetes manifests: `deploy/kubernetes/`
-- Environment overlays: `config/environments/{dev,staging,prod}.yaml`
+- Deployment profiles: `config/profiles/{dev,staging,prod}.yaml`
 - Runbook: `docs/operations.md`
+- n8n workflow integration (no-code deployment): `n8n/`
