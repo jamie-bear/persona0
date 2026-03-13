@@ -50,7 +50,7 @@ persona0/
 │   ├── engine/                         # Core ego engine
 │   │   ├── adapters/                   # External service adapters
 │   │   │   ├── embeddings.py           # Deterministic (dev) embedding generation
-│   │   │   └── llm.py                  # Mock / OpenAI / Anthropic providers
+│   │   │   └── llm.py                  # Mock / OpenAI / Anthropic / Grok providers
 │   │   ├── cycles/                     # Cognitive cycle implementations
 │   │   │   ├── fast_tick.py            # High-frequency perception cycle
 │   │   │   ├── slow_tick.py            # Low-frequency reflection cycle
@@ -126,13 +126,14 @@ Threshold documentation: `tests/eval/README.md`. Run with `pytest tests/eval/ -v
 
 ## LLM Provider Configuration
 
-The LLM adapter (`src/engine/adapters/llm.py`) supports three providers:
+The LLM adapter (`src/engine/adapters/llm.py`) supports four providers:
 
 | Provider | Env var | Notes |
 |----------|---------|-------|
 | `mock` (default) | — | Deterministic fallback, no API key required |
 | `openai` | `OPENAI_API_KEY` | `pip install openai` required |
 | `anthropic` | `ANTHROPIC_API_KEY` | `pip install anthropic` required |
+| `grok` | `XAI_API_KEY` | `pip install openai` required (OpenAI-compatible API) |
 
 All real providers support streaming, exponential back-off retry, and token-bucket rate limiting. Set `PERSONA0_LLM_ADAPTER__PROVIDER` and the matching API key env var.
 

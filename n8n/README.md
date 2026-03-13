@@ -237,13 +237,14 @@ The workflows ship with a **Mock LLM Response** node enabled by default. To conn
 
 ## Production LLM Configuration
 
-The Python backend now supports three LLM providers natively:
+The Python backend now supports four LLM providers natively:
 
 | Provider | Config Value | Required Env Var | Notes |
 |----------|-------------|-----------------|-------|
 | Mock | `mock` (default) | None | Deterministic responses for dev/test |
 | OpenAI | `openai` | `OPENAI_API_KEY` | Supports streaming, rate limiting |
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | Supports streaming, rate limiting |
+| Grok (xAI) | `grok` | `XAI_API_KEY` | OpenAI-compatible API, supports streaming, rate limiting |
 
 All providers include:
 - **Exponential backoff** on transient failures (1s, 2s, 4s...)
