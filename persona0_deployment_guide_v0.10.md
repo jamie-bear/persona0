@@ -411,13 +411,14 @@ The steps in Sections 1–5 use deterministic fallbacks for all LLM calls. This 
 
 The LLM adapter (`src/engine/adapters/llm.py`) is the only place in the codebase that calls an external language model. This is intentional — it enforces the thesis that the LLM is just a renderer. To use a real provider, you set environment variables rather than editing source code.
 
-The adapter supports three providers out of the box:
+The adapter supports four providers out of the box:
 
 | Provider | `PERSONA0_LLM_ADAPTER__PROVIDER` value | API key env var |
 |----------|----------------------------------------|----------------|
 | Mock (default) | `mock` | None required |
 | OpenAI | `openai` | `OPENAI_API_KEY` |
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` |
+| Grok (xAI) | `grok` | `XAI_API_KEY` |
 
 All real providers include exponential back-off retry logic, token-bucket rate limiting, and optional streaming responses.
 
@@ -437,6 +438,11 @@ export OPENAI_API_KEY=your-openai-key-here
 export PERSONA0_CONFIG_PROFILE=staging
 export PERSONA0_LLM_ADAPTER__PROVIDER=anthropic
 export ANTHROPIC_API_KEY=your-anthropic-key-here
+
+# Grok (xAI) — macOS / Linux
+export PERSONA0_CONFIG_PROFILE=staging
+export PERSONA0_LLM_ADAPTER__PROVIDER=grok
+export XAI_API_KEY=your-xai-key-here
 
 # Windows PowerShell equivalents (replace export with $env:VARIABLE = 'value')
 ```
@@ -463,6 +469,9 @@ export PERSONA0_LLM_ADAPTER__MODEL=gpt-4o
 # Anthropic
 export PERSONA0_LLM_ADAPTER__MODEL=claude-sonnet-4-20250514
 
+# Grok (xAI)
+export PERSONA0_LLM_ADAPTER__MODEL=grok-3-latest
+
 # Enable streaming (lower time-to-first-token)
 export PERSONA0_LLM_ADAPTER__STREAMING=true
 
@@ -473,7 +482,7 @@ export PERSONA0_LLM_ADAPTER__RATE_LIMIT_RPM=120
 Check `config/profiles/staging.yaml` for the full list of LLM adapter options (timeout, retries, etc.).
 
 > 📌 **NOTE**
-> The adapter requires `openai` (pip install openai) or `anthropic` (pip install anthropic) to be installed for their respective providers. Both are optional dependencies — they are not installed by the default `pip install -e .[dev]` command. Install only the one you intend to use.
+> The adapter requires `openai` (pip install openai) or `anthropic` (pip install anthropic) to be installed for their respective providers. Grok also uses the `openai` package (it is OpenAI-compatible). These are optional dependencies — they are not installed by the default `pip install -e .[dev]` command. Install only the one you intend to use.
 
 ---
 

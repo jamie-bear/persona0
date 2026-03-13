@@ -122,7 +122,7 @@
     "confidence_archival_threshold": 0.15
   },
   "llm_adapter": {
-    "_comment": "LLM provider configuration. Set provider to 'openai' or 'anthropic' for production.",
+    "_comment": "LLM provider configuration. Set provider to 'openai', 'anthropic', or 'grok' for production.",
     "provider": "mock",
     "model": "mock-chat-v1",
     "timeout_seconds": 30,
